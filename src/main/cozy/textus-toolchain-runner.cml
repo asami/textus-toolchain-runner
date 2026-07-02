@@ -1,0 +1,138 @@
+# COMPONENT
+
+## ToolchainRunner
+
+### PACKAGE
+
+org.simplemodeling.textus.toolchainrunner
+
+### DESCRIPTION
+
+Textus component that exposes the existing Cozy toolchain Docker image as
+artifact conversion operations. The component does not own a specific artifact
+domain; it runs installed toolchain commands in a controlled Docker workspace.
+
+# SERVICE
+
+## Toolchain
+
+### DESCRIPTION
+
+Operations for converting and inspecting generated artifacts through the Cozy
+toolchain Docker image.
+
+### OPERATION
+
+#### convertSvgToPdf
+
+Converts one SVG file to one PDF file by running the `svg-pages-to-pdf`
+toolchain command inside the Cozy toolchain Docker image.
+
+##### TYPE
+
+QUERY
+
+##### INPUT
+
+###### TYPE
+ConvertSvgToPdfQuery
+
+###### VALUE
+
+####### ConvertSvgToPdfQuery
+
+######## EXTENDS
+
+QueryAction
+
+######## ATTRIBUTE
+
+| name          | type   | multiplicity |
+|---------------+--------+--------------|
+| svg           | string | 1            |
+| out           | string | ?            |
+| dockerImage   | string | ?            |
+| dockerCommand | string | ?            |
+| workDir       | string | ?            |
+
+##### OUTPUT
+
+###### TYPE
+ToolchainArtifactResult
+
+###### VALUE
+
+####### ToolchainArtifactResult
+
+######## EXTENDS
+
+OperationResult
+
+######## ATTRIBUTE
+
+| name         | type    | multiplicity |
+|--------------+---------+--------------|
+| valid        | boolean | 1            |
+| errorCount   | int     | 1            |
+| warningCount | int     | 1            |
+| message      | string  | 1            |
+| out          | string  | 1            |
+| pageCount    | int     | 1            |
+| dockerImage  | string  | 1            |
+
+#### convertSvgPagesToPdf
+
+Converts multiple SVG files to a single multi-page PDF by running the
+`svg-pages-to-pdf` toolchain command inside the Cozy toolchain Docker image.
+
+##### TYPE
+
+QUERY
+
+##### INPUT
+
+###### TYPE
+ConvertSvgPagesToPdfQuery
+
+###### VALUE
+
+####### ConvertSvgPagesToPdfQuery
+
+######## EXTENDS
+
+QueryAction
+
+######## ATTRIBUTE
+
+| name          | type   | multiplicity |
+|---------------+--------+--------------|
+| svgFiles      | string | 1            |
+| out           | string | ?            |
+| dockerImage   | string | ?            |
+| dockerCommand | string | ?            |
+| workDir       | string | ?            |
+
+##### OUTPUT
+
+###### TYPE
+ToolchainArtifactResult
+
+###### VALUE
+
+####### ToolchainArtifactResult
+
+######## EXTENDS
+
+OperationResult
+
+######## ATTRIBUTE
+
+| name         | type    | multiplicity |
+|--------------+---------+--------------|
+| valid        | boolean | 1            |
+| errorCount   | int     | 1            |
+| warningCount | int     | 1            |
+| message      | string  | 1            |
+| out          | string  | 1            |
+| pageCount    | int     | 1            |
+| dockerImage  | string  | 1            |

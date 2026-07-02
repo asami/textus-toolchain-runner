@@ -1,0 +1,6 @@
+apps:
+  - name: textus-toolchain-runner
+    path: /web/textus-toolchain-runner
+    kind: static-form
+    root: /web/textus-toolchain-runner
+    route: /web/{component}/textus-toolchain-runner

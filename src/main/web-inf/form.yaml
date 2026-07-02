@@ -1,0 +1,19 @@
+expose:
+  textus-toolchain-runner.notice.post-notice: protected
+  textus-toolchain-runner.notice.search-notices: public
+form:
+  textus-toolchain-runner.notice.post-notice:
+    enabled: true
+    successRedirect: /web/${component}/admin/entities/notice/${result.id}
+    stayOnError: true
+    controls:
+      body:
+        type: textarea
+        required: true
+  textus-toolchain-runner.notice.search-notices:
+    enabled: true
+    successRedirect: /web/${component}/admin/entities/notice
+    stayOnError: true
+admin:
+  entity.notice:
+    totalCount: optional
