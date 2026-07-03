@@ -19,11 +19,10 @@ packaging:
   car:
     runtime:
       cncf:
-        minimum: "0.4.11"
+        minimum: "0.4.13-SNAPSHOT"
         excluded: []
         tested:
-          - "0.4.11"
-          - "0.4.12"
+          - "0.4.13-SNAPSHOT"
 
 warehouse:
   repository_artifacts:

@@ -2,9 +2,7 @@ import org.goldenport.cozy.CozyPlugin.autoImport._
 import sbt.Keys.*
 
 val scala3Version = "3.3.7"
-val cncfVersion = "0.4.12"
-
-lazy val cozyBundleFactoryClassName = settingKey[Option[String]]("Optional Component.BundleFactory implementation class for ServiceLoader discovery.")
+val cncfVersion = "0.4.13-SNAPSHOT"
 
 lazy val root = project
   .in(file("."))
@@ -53,19 +51,5 @@ lazy val root = project
       IO.createDirectory(out.getParentFile)
       IO.write(out, content)
       Seq(out)
-    }.taskValue,
-
-    cozyBundleFactoryClassName := {
-      val source = baseDirectory.value / "src" / "main" / "scala" / "org" / "simplemodeling" / "textus" / "toolchainrunner" / "impl" / "ComponentFactory.scala"
-      if (source.isFile) Some("org.simplemodeling.textus.toolchainrunner.impl.ComponentFactory") else None
-    },
-
-    Compile / resourceGenerators += Def.task {
-      cozyBundleFactoryClassName.value.map { classname =>
-        val out = (Compile / resourceManaged).value / "META-INF" / "services" / "org.goldenport.cncf.component.Component$BundleFactory"
-        IO.createDirectory(out.getParentFile)
-        IO.write(out, classname + "\n")
-        out
-      }.toSeq
     }.taskValue
   )

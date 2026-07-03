@@ -1,24 +1,25 @@
 package org.simplemodeling.textus.toolchainrunner.impl
 
-import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
-import scala.jdk.CollectionConverters.*
 import scala.util.Try
-import org.goldenport.cncf.action.{ActionCall}
+import cats.syntax.functor.*
+import org.goldenport.cncf.action.{ActionCall, ActionCallShellCommandPart}
 import org.goldenport.cncf.component.{Component, ComponentCreate, ComponentId}
-import org.goldenport.cncf.config.{RuntimeConfig}
 import org.goldenport.cncf.unitofwork.ExecUowM
-import org.goldenport.configuration.ResolvedConfiguration
 import org.goldenport.protocol.operation.OperationResponse
+import org.goldenport.process.{ShellCommand, ShellCommandResult}
 import org.goldenport.record.Record
 import org.simplemodeling.textus.toolchainrunner.ToolchainRunnerComponent
 
-final class ComponentFactory extends Component.BundleFactory {
-  def primaryFactory: Component.PrimaryComponentFactory =
-    ToolchainRunnerPrimaryFactory
+final class ComponentFactory extends ToolchainRunnerParticipantFactoryBase with Component.PrimaryComponentFactory {
+  override protected def create_Component(params: ComponentCreate): Component =
+    ToolchainRunnerPrimaryFactory.configureSpi(new ToolchainRunnerPrimaryComponent())
 
-  override def componentletFactories: Vector[Component.ComponentletFactory] =
-    Vector.empty
+  override protected def create_Core(
+    params: ComponentCreate,
+    comp: Component
+  ): Component.Core =
+    component_core(ToolchainRunnerComponent.name, ToolchainRunnerComponent.componentId)
 }
 
 abstract class ToolchainRunnerParticipantFactoryBase extends ToolchainRunnerComponent.Factory {
@@ -40,8 +41,17 @@ abstract class ToolchainRunnerParticipantFactoryBase extends ToolchainRunnerComp
 final class ToolchainRunnerPrimaryComponent extends ToolchainRunnerComponent
 
 object ToolchainRunnerPrimaryFactory extends ToolchainRunnerParticipantFactoryBase with Component.PrimaryComponentFactory {
+  private[impl] def configureSpi(
+    component: ToolchainRunnerPrimaryComponent
+  ): Component =
+    component.withPort(
+      Component.Port
+        .of(new TextusToolchainRunnerProvider(component))
+        .orElse(component.port)
+    )
+
   override protected def create_Component(params: ComponentCreate): Component =
-    new ToolchainRunnerPrimaryComponent()
+    configureSpi(new ToolchainRunnerPrimaryComponent())
 
   override protected def create_Core(
     params: ComponentCreate,
@@ -74,43 +84,47 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
   private final case class ConvertSvgToPdfActionCallImpl(
     core: ActionCall.Core,
     override val action: ConvertSvgToPdfQuery
-  ) extends ConvertSvgToPdfActionCall {
+  ) extends ConvertSvgToPdfActionCall with ActionCallShellCommandPart {
     protected def build_Program: ExecUowM[OperationResponse] = {
       val svg = action.record.getString("svg").getOrElse("")
       val out = action.record.getString("out").filter(_.nonEmpty).
         getOrElse(_default_pdf_out(svg, "output.pdf"))
-      val dockerimage = _docker_image(core, action.record.getString("dockerImage"))
+      val dockerimage = _docker_image(action.record.getString("dockerImage"), config_string)
       val dockercommand = action.record.getString("dockerCommand").filter(_.nonEmpty).getOrElse("docker")
       val workdir = action.record.getString("workDir").filter(_.nonEmpty).map(Paths.get(_))
-      val result = _convert_svg_pages_to_pdf(
+      _convert_svg_pages_to_pdf(
         Vector(svg),
         Paths.get(out),
         dockerimage,
         dockercommand,
-        workdir
-      )
-      exec_pure(_to_response(result, out))
+        workdir,
+        exec_pure,
+        (command, work) =>
+          shell_exec(ShellCommand(command, Some(work))).map(_shell_result(command, _))
+      ).map(result => _to_response(result, out))
     }
   }
 
   private final case class ConvertSvgPagesToPdfActionCallImpl(
     core: ActionCall.Core,
     override val action: ConvertSvgPagesToPdfQuery
-  ) extends ConvertSvgPagesToPdfActionCall {
+  ) extends ConvertSvgPagesToPdfActionCall with ActionCallShellCommandPart {
     protected def build_Program: ExecUowM[OperationResponse] = {
       val svgfiles = _split_svg_files(action.record.getString("svgFiles").getOrElse(""))
       val out = action.record.getString("out").filter(_.nonEmpty).getOrElse("print.pdf")
-      val dockerimage = _docker_image(core, action.record.getString("dockerImage"))
+      val dockerimage = _docker_image(action.record.getString("dockerImage"), config_string)
       val dockercommand = action.record.getString("dockerCommand").filter(_.nonEmpty).getOrElse("docker")
       val workdir = action.record.getString("workDir").filter(_.nonEmpty).map(Paths.get(_))
-      val result = _convert_svg_pages_to_pdf(
+      _convert_svg_pages_to_pdf(
         svgfiles,
         Paths.get(out),
         dockerimage,
         dockercommand,
-        workdir
-      )
-      exec_pure(_to_response(result, out))
+        workdir,
+        exec_pure,
+        (command, work) =>
+          shell_exec(ShellCommand(command, Some(work))).map(_shell_result(command, _))
+      ).map(result => _to_response(result, out))
     }
   }
 
@@ -119,8 +133,10 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
     out: Path,
     dockerimage: String,
     dockercommand: String,
-    workdir: Option[Path]
-  ): Either[String, ToolchainRunResult] = {
+    workdir: Option[Path],
+    pure: Either[String, ToolchainRunResult] => ExecUowM[Either[String, ToolchainRunResult]],
+    runShell: (Vector[String], Path) => ExecUowM[Either[String, String]]
+  ): ExecUowM[Either[String, ToolchainRunResult]] = {
     val inputs = svgfiles.map(s => Paths.get(s).toAbsolutePath.normalize)
     val validation: Either[String, Vector[Path]] =
       if (inputs.isEmpty)
@@ -153,34 +169,41 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
           "--out",
           workout.getFileName.toString
         ) ++ pages
-        _run(command, work).flatMap { _ =>
-          if (!Files.isRegularFile(workout))
-            Left("toolchain did not create output.pdf")
-          else {
-            val outabs = out.toAbsolutePath.normalize
-            val parent = outabs.getParent
-            if (parent != null)
-              Files.createDirectories(parent)
-            Files.copy(workout, outabs, StandardCopyOption.REPLACE_EXISTING)
-            Right(ToolchainRunResult(outabs, pages.length, dockerimage))
+        Right((command, work, workout, pages.length))
+      }.toEither.left.map(e => s"${e.getClass.getSimpleName}: ${Option(e.getMessage).getOrElse("")}").flatten
+    } match {
+      case Left(message) => pure(Left(message))
+      case Right((command, work, workout, pagecount)) =>
+        runShell(command, work).map { result =>
+          result.flatMap { _ =>
+            if (!Files.isRegularFile(workout))
+              Left("toolchain did not create output.pdf")
+            else {
+              val outabs = out.toAbsolutePath.normalize
+              val parent = outabs.getParent
+              if (parent != null)
+                Files.createDirectories(parent)
+              Files.copy(workout, outabs, StandardCopyOption.REPLACE_EXISTING)
+              Right(ToolchainRunResult(outabs, pagecount, dockerimage))
+            }
           }
         }
-      }.toEither.left.map(e => s"${e.getClass.getSimpleName}: ${Option(e.getMessage).getOrElse("")}").flatten
     }
   }
 
-  private def _run(command: Vector[String], cwd: Path): Either[String, String] = {
-    val process = ProcessBuilder(command.asJava).
-      directory(cwd.toFile).
-      redirectErrorStream(true).
-      start()
-    val output = String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
-    val exit = process.waitFor()
-    if (exit == 0)
-      Right(output)
-    else
-      Left(s"toolchain command failed with exit $exit: ${command.mkString(" ")}\n$output")
-  }
+  private def _shell_result(
+    command: Vector[String],
+    result: ShellCommandResult
+  ): Either[String, String] =
+    if (result.exitCode == 0)
+      Right(result.stdout.asStringUnsafe())
+    else {
+      val output = Vector(
+        result.stdout.asStringUnsafe(),
+        result.stderr.asStringUnsafe()
+      ).filter(_.nonEmpty).mkString("\n")
+      Left(s"toolchain command failed with exit ${result.exitCode}: ${command.mkString(" ")}\n$output")
+    }
 
   private def _split_svg_files(value: String): Vector[String] =
     value.split("[\n,]").toVector.map(_.trim).filter(_.nonEmpty)
@@ -198,14 +221,17 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
     }
   }
 
-  private def _docker_image(core: ActionCall.Core, explicit: Option[String]): String =
+  private def _docker_image(
+    explicit: Option[String],
+    config: String => Option[String]
+  ): String =
     explicit.filter(_.nonEmpty).
-      orElse(core.component.flatMap(_.subsystem).map(_.configuration).flatMap(_docker_image)).
+      orElse(_docker_image_config(config)).
       orElse(sys.env.get("TEXTUS_TOOLCHAIN_DOCKER_IMAGE").filter(_.nonEmpty)).
       orElse(sys.env.get("COZY_DOCKER_IMAGE").filter(_.nonEmpty)).
       getOrElse("ghcr.io/asami/cozy-toolchain:0.2.24-SNAPSHOT")
 
-  private def _docker_image(conf: ResolvedConfiguration): Option[String] =
+  private def _docker_image_config(config: String => Option[String]): Option[String] =
     Vector(
       "textus.toolchain-runner.docker.image",
       "textus.toolchainRunner.docker.image",
@@ -213,7 +239,7 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
       "cozy.toolchain.docker.image",
       "cozy.docker-image",
       "cozy.docker.image"
-    ).flatMap(key => RuntimeConfig.getString(conf, key)).map(_.trim).find(_.nonEmpty)
+    ).flatMap(config).map(_.trim).find(_.nonEmpty)
 
   private def _to_response(result: Either[String, ToolchainRunResult], out: String): OperationResponse =
     result match {

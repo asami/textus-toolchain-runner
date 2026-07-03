@@ -4,6 +4,8 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import org.goldenport.cncf.component.{ComponentCreate, ComponentOrigin}
 import org.goldenport.cncf.context.ExecutionContext
+import org.goldenport.cncf.spi.{SpiContract, SpiSelection}
+import org.goldenport.cncf.spi.toolchain.runner.{ConvertSvgPagesToPdfRequest, ToolchainRunner}
 import org.goldenport.cncf.subsystem.Subsystem
 import org.goldenport.configuration.{Configuration, ConfigurationTrace, ResolvedConfiguration}
 import org.goldenport.protocol.{Property, Request}
@@ -16,6 +18,40 @@ import org.simplemodeling.textus.toolchainrunner.impl
 
 class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen {
   "ToolchainRunner component" should {
+    "publish ToolchainRunner as a CNCF SPI provider" in {
+      Given("a ToolchainRunner component and a fake docker command")
+      val component = _component_under_test()
+      given ExecutionContext = component.logic.executionContext()
+      val dir = Files.createTempDirectory("textus-toolchain-runner-spi-spec")
+      val svg = dir.resolve("main.svg")
+      val out = dir.resolve("print.pdf")
+      val fakedocker = _fake_docker(dir)
+      Files.writeString(svg, """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"/>""", StandardCharsets.UTF_8)
+
+      When("the ToolchainRunner SPI provider is resolved from the component port")
+      val provider = component.port.entries.collectFirst {
+        case x: impl.TextusToolchainRunnerProvider => x
+      }.get
+      val spi = provider
+        .provide(SpiContract("toolchain-runner", classOf[ToolchainRunner]), SpiSelection())
+        .toOption
+        .get
+      val response = spi.convertSvgPagesToPdf(
+        ConvertSvgPagesToPdfRequest(
+          svgFiles = Vector(svg.toString),
+          out = Some(out.toString),
+          dockerCommand = Some(fakedocker.toString),
+          dockerImage = Some("fake/cozy-toolchain:latest")
+        )
+      ).toOption.get
+
+      Then("the SPI delegates to the existing toolchain operation")
+      response.valid shouldBe true
+      response.pageCount shouldBe 1
+      response.dockerImage shouldBe Some("fake/cozy-toolchain:latest")
+      Files.readString(out, StandardCharsets.UTF_8) should include ("fake pdf")
+    }
+
     "convert SVG pages to a PDF through the configured Docker command" in {
       Given("a ToolchainRunner component and a fake docker command")
       val component = _component_under_test()
@@ -24,7 +60,7 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
       val svg1 = dir.resolve("main.svg")
       val svg2 = dir.resolve("detail.svg")
       val out = dir.resolve("print.pdf")
-      val fakeDocker = _fake_docker(dir)
+      val fakedocker = _fake_docker(dir)
       Files.writeString(svg1, """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"/>""", StandardCharsets.UTF_8)
       Files.writeString(svg2, """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"/>""", StandardCharsets.UTF_8)
 
@@ -34,7 +70,7 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
         "convertSvgPagesToPdf",
         "svgFiles" -> s"${svg1.toString},${svg2.toString}",
         "out" -> out.toString,
-        "dockerCommand" -> fakeDocker.toString,
+        "dockerCommand" -> fakedocker.toString,
         "dockerImage" -> "fake/cozy-toolchain:latest"
       )
 
@@ -53,7 +89,7 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
       val dir = Files.createTempDirectory("textus-toolchain-runner-default-image-spec")
       val svg = dir.resolve("page.svg")
       val out = dir.resolve("print.pdf")
-      val fakeDocker = _fake_docker(dir)
+      val fakedocker = _fake_docker(dir)
       Files.writeString(svg, """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"/>""", StandardCharsets.UTF_8)
 
       When("convertSvgToPdf is executed without dockerImage")
@@ -62,7 +98,7 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
         "convertSvgToPdf",
         "svg" -> svg.toString,
         "out" -> out.toString,
-        "dockerCommand" -> fakeDocker.toString
+        "dockerCommand" -> fakedocker.toString
       )
 
       Then("the operation uses the toolchain image version that provides svg-pages-to-pdf")
