@@ -1,4 +1,5 @@
 target/
+maven-local
 .bsp/
 .metals/
 .scala-build/

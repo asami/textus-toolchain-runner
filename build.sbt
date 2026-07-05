@@ -2,7 +2,7 @@ import org.goldenport.cozy.CozyPlugin.autoImport._
 import sbt.Keys.*
 
 val scala3Version = "3.3.7"
-val cncfVersion = "0.4.13-SNAPSHOT"
+val cncfVersion = "0.4.13"
 
 lazy val root = project
   .in(file("."))
@@ -10,7 +10,7 @@ lazy val root = project
   .settings(
     organization := "org.simplemodeling.textus",
     name := "textus-toolchain-runner",
-    version := "0.1.0-SNAPSHOT",
+    version := "0.1.0",
 
     scalaVersion := scala3Version,
     useCoursier := false,

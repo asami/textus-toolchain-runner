@@ -82,7 +82,7 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
       Files.readString(dir.resolve("fake-docker-args.txt"), StandardCharsets.UTF_8) should include ("svg-pages-to-pdf")
     }
 
-    "use the Cozy toolchain snapshot image by default" in {
+    "use the Cozy toolchain release image by default" in {
       Given("a ToolchainRunner component and a fake docker command")
       val component = _component_under_test()
       given ExecutionContext = component.logic.executionContext()
@@ -103,8 +103,8 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
 
       Then("the operation uses the toolchain image version that provides svg-pages-to-pdf")
       record.getBoolean("valid") shouldBe Some(true)
-      record.getString("dockerImage") shouldBe Some("ghcr.io/asami/cozy-toolchain:0.2.24-SNAPSHOT")
-      Files.readString(dir.resolve("fake-docker-args.txt"), StandardCharsets.UTF_8) should include ("ghcr.io/asami/cozy-toolchain:0.2.24-SNAPSHOT")
+      record.getString("dockerImage") shouldBe Some("ghcr.io/asami/cozy-toolchain:latest")
+      Files.readString(dir.resolve("fake-docker-args.txt"), StandardCharsets.UTF_8) should include ("ghcr.io/asami/cozy-toolchain:latest")
     }
   }
 

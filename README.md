@@ -10,7 +10,7 @@ image.
 Default Docker image:
 
 ```text
-ghcr.io/asami/cozy-toolchain:0.2.24-SNAPSHOT
+ghcr.io/asami/cozy-toolchain:latest
 ```
 
 The image can be overridden with operation parameters or config:
@@ -19,7 +19,7 @@ The image can be overridden with operation parameters or config:
 textus:
   toolchain-runner:
     docker:
-      image: ghcr.io/asami/cozy-toolchain:0.2.24-SNAPSHOT
+      image: ghcr.io/asami/cozy-toolchain:latest
 ```
 
 ## Operations
