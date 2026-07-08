@@ -1,7 +1,7 @@
 package org.simplemodeling.textus.toolchainrunner
 
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path}
+import java.nio.file.{Files, Path, Paths}
 import org.goldenport.cncf.component.{ComponentCreate, ComponentOrigin}
 import org.goldenport.cncf.context.ExecutionContext
 import org.goldenport.cncf.spi.{SpiContract, SpiSelection}
@@ -41,14 +41,14 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
           svgFiles = Vector(svg.toString),
           out = Some(out.toString),
           dockerCommand = Some(fakedocker.toString),
-          dockerImage = Some("fake/cozy-toolchain:latest")
+          dockerImage = Some("fake/textus-toolchain:latest")
         )
       ).toOption.get
 
       Then("the SPI delegates to the existing toolchain operation")
       response.valid shouldBe true
       response.pageCount shouldBe 1
-      response.dockerImage shouldBe Some("fake/cozy-toolchain:latest")
+      response.dockerImage shouldBe Some("fake/textus-toolchain:latest")
       Files.readString(out, StandardCharsets.UTF_8) should include ("fake pdf")
     }
 
@@ -71,18 +71,18 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
         "svgFiles" -> s"${svg1.toString},${svg2.toString}",
         "out" -> out.toString,
         "dockerCommand" -> fakedocker.toString,
-        "dockerImage" -> "fake/cozy-toolchain:latest"
+        "dockerImage" -> "fake/textus-toolchain:latest"
       )
 
       Then("a multi-page PDF artifact is reported")
       record.getBoolean("valid") shouldBe Some(true)
       record.getInt("pageCount") shouldBe Some(2)
-      record.getString("dockerImage") shouldBe Some("fake/cozy-toolchain:latest")
+      record.getString("dockerImage") shouldBe Some("fake/textus-toolchain:latest")
       Files.readString(out, StandardCharsets.UTF_8) should include ("fake pdf")
       Files.readString(dir.resolve("fake-docker-args.txt"), StandardCharsets.UTF_8) should include ("svg-pages-to-pdf")
     }
 
-    "use the Cozy toolchain release image by default" in {
+    "use the Textus toolchain release image by default" in {
       Given("a ToolchainRunner component and a fake docker command")
       val component = _component_under_test()
       given ExecutionContext = component.logic.executionContext()
@@ -103,8 +103,60 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
 
       Then("the operation uses the toolchain image version that provides svg-pages-to-pdf")
       record.getBoolean("valid") shouldBe Some(true)
-      record.getString("dockerImage") shouldBe Some("ghcr.io/asami/cozy-toolchain:latest")
-      Files.readString(dir.resolve("fake-docker-args.txt"), StandardCharsets.UTF_8) should include ("ghcr.io/asami/cozy-toolchain:latest")
+      record.getString("dockerImage") shouldBe Some("ghcr.io/asami/textus-toolchain:latest")
+      Files.readString(dir.resolve("fake-docker-args.txt"), StandardCharsets.UTF_8) should include ("ghcr.io/asami/textus-toolchain:latest")
+    }
+
+    "own the Textus toolchain Docker assets" in {
+      Given("the Textus toolchain Dockerfile, wrapper script, and packaged component developer manual")
+      val root = Paths.get(sys.props("user.dir")).toAbsolutePath.normalize()
+      val dockerfile = Files.readString(root.resolve("docker/textus-toolchain/Dockerfile"), StandardCharsets.UTF_8)
+      val script = Files.readString(root.resolve("docker/textus-toolchain/textus-toolchain"), StandardCharsets.UTF_8)
+      val manual = Files.readString(root.resolve("src/main/web/docs/user-guide.html"), StandardCharsets.UTF_8)
+      val manualmarkdown = Files.readString(root.resolve("src/main/web/docs/user-guide.md"), StandardCharsets.UTF_8)
+
+      Then("the Dockerfile includes the BoK, PDF, and video runtime dependencies")
+      dockerfile should include("asciidoctor-pdf")
+      dockerfile should include("@antora/cli")
+      dockerfile should include("ffmpeg")
+      dockerfile should include("playwright")
+      dockerfile should include("@remotion/renderer")
+      dockerfile should include("python3-pil")
+      dockerfile should include("whisper.cpp")
+      dockerfile should include("ggml-base.bin")
+      dockerfile should include("NODE_PATH")
+      dockerfile should include("FROM ${KROKI_IMAGE}")
+
+      And("the wrapper exposes deterministic toolchain checks and command pass-through")
+      script should include("check_bok")
+      script should include("check_pdf")
+      script should include("check_kroki")
+      script should include("check_video")
+      script should include("svg_pages_to_pdf")
+      script should include("svg-pages-to-pdf")
+      script should include("Usage: svg-pages-to-pdf --out output.pdf")
+      script should include("SVG file not found")
+      script should include("preferCSSPageSize")
+      script should include("node_with_global_modules")
+      script should include("npm root -g")
+      script should include("fs.existsSync(path)")
+      script should include("kroki-server")
+      script should include("SMARTDOX_KROKI_PORT=\"${SMARTDOX_KROKI_PORT:-9609}\"")
+      script should include("textus-toolchain check ${target}: ok")
+      script should include("exec \"$@\"")
+
+      And("the CAR manual is the component developer source for direct Docker usage")
+      manual should include("Textus Toolchain Runner")
+      manual should include("Textus Component Developer Guide")
+      manual should include("src/main/cozy/textus-toolchain-runner.cml")
+      manual should include("/man/{component}/user-guide.html")
+      manual should include("/man/{component}/user-guide.md")
+      manual should include("/help/{component}")
+      manual should include("Direct Docker Image Usage")
+      manual should include("docker run --rm ghcr.io/asami/textus-toolchain:latest textus-toolchain check all")
+      manual should include("svg-pages-to-pdf --out print.pdf")
+      manualmarkdown should include("# Textus Toolchain Runner Component Developer Guide")
+      manualmarkdown should include("/man/{component}/user-guide.md")
     }
   }
 

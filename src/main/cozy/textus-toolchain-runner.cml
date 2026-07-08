@@ -8,7 +8,7 @@ org.simplemodeling.textus.toolchainrunner
 
 ### DESCRIPTION
 
-Textus component that exposes the existing Cozy toolchain Docker image as
+Textus component that owns the Textus toolchain Docker image and exposes it as
 artifact conversion operations. The component does not own a specific artifact
 domain; it runs installed toolchain commands in a controlled Docker workspace.
 
@@ -18,7 +18,7 @@ domain; it runs installed toolchain commands in a controlled Docker workspace.
 
 ### DESCRIPTION
 
-Operations for converting and inspecting generated artifacts through the Cozy
+Operations for converting and inspecting generated artifacts through the Textus
 toolchain Docker image.
 
 ### OPERATION
@@ -26,7 +26,7 @@ toolchain Docker image.
 #### convertSvgToPdf
 
 Converts one SVG file to one PDF file by running the `svg-pages-to-pdf`
-toolchain command inside the Cozy toolchain Docker image.
+toolchain command inside the Textus toolchain Docker image.
 
 ##### TYPE
 
@@ -83,7 +83,7 @@ OperationResult
 #### convertSvgPagesToPdf
 
 Converts multiple SVG files to a single multi-page PDF by running the
-`svg-pages-to-pdf` toolchain command inside the Cozy toolchain Docker image.
+`svg-pages-to-pdf` toolchain command inside the Textus toolchain Docker image.
 
 ##### TYPE
 

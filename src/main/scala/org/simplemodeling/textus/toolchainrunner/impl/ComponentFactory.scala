@@ -229,7 +229,7 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
       orElse(_docker_image_config(config)).
       orElse(sys.env.get("TEXTUS_TOOLCHAIN_DOCKER_IMAGE").filter(_.nonEmpty)).
       orElse(sys.env.get("COZY_DOCKER_IMAGE").filter(_.nonEmpty)).
-      getOrElse("ghcr.io/asami/cozy-toolchain:latest")
+      getOrElse("ghcr.io/asami/textus-toolchain:latest")
 
   private def _docker_image_config(config: String => Option[String]): Option[String] =
     Vector(

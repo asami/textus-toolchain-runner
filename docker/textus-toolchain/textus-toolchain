@@ -1,0 +1,356 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SMARTDOX_KROKI_PORT="${SMARTDOX_KROKI_PORT:-8000}"
+TEXTUS_WHISPER_MODEL="${TEXTUS_WHISPER_MODEL:-/opt/textus/models/ggml-base.bin}"
+KROKI_PID=""
+
+find_kroki_jar() {
+  for jar in \
+    /usr/local/kroki/kroki-server.jar \
+    /usr/local/kroki/kroki.jar \
+    /usr/local/kroki/*.jar \
+    /opt/kroki/kroki-server.jar \
+    /opt/kroki/kroki.jar \
+    /opt/kroki/*.jar
+  do
+    if [[ -f "$jar" ]]; then
+      printf '%s\n' "$jar"
+      return 0
+    fi
+  done
+  echo "textus-toolchain: Kroki jar not found in /usr/local/kroki or /opt/kroki" >&2
+  return 1
+}
+
+cleanup() {
+  if [[ -n "$KROKI_PID" ]]; then
+    kill "$KROKI_PID" 2>/dev/null || true
+  fi
+}
+
+run_kroki_server() {
+  local jar
+  jar="$(find_kroki_jar)"
+  trap cleanup EXIT INT TERM
+  java ${JAVA_OPTS:-} ${SMARTDOX_KROKI_JAVA_OPTS:-} \
+    -Dquarkus.http.host=0.0.0.0 \
+    -Dquarkus.http.port="${SMARTDOX_KROKI_PORT}" \
+    -jar "$jar" "$@"
+}
+
+start_kroki_server() {
+  local jar
+  jar="$(find_kroki_jar)"
+  trap cleanup EXIT INT TERM
+  java ${JAVA_OPTS:-} ${SMARTDOX_KROKI_JAVA_OPTS:-} \
+    -Dquarkus.http.host=127.0.0.1 \
+    -Dquarkus.http.port="${SMARTDOX_KROKI_PORT}" \
+    -jar "$jar" \
+    >/tmp/textus-toolchain-kroki.log 2>&1 &
+  KROKI_PID="$!"
+  trap cleanup EXIT INT TERM
+  for _ in $(seq 1 60); do
+    if curl -fsS "http://127.0.0.1:${SMARTDOX_KROKI_PORT}/" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.5
+  done
+  echo "textus-toolchain: Kroki server did not become ready on port ${SMARTDOX_KROKI_PORT}" >&2
+  exit 1
+}
+
+require_command() {
+  local name="$1"
+  if ! command -v "$name" >/dev/null 2>&1; then
+    echo "missing command: $name" >&2
+    return 1
+  fi
+}
+
+node_with_global_modules() {
+  NODE_PATH="${NODE_PATH:-$(npm root -g)}" node "$@"
+}
+
+check_bok() {
+  require_command node
+  require_command npm
+  require_command antora
+  node_with_global_modules -e "require.resolve('@antora/cli'); require.resolve('@antora/site-generator'); require.resolve('asciidoctor-kroki')"
+  find_kroki_jar >/dev/null
+}
+
+check_pdf() {
+  require_command ruby
+  require_command asciidoctor-pdf
+  require_command uplatex
+  require_command lualatex
+  require_command dvipdfmx
+  require_command curl
+  require_command node
+  find_kroki_jar >/dev/null
+  node_with_global_modules -e "require.resolve('playwright')"
+  node_with_global_modules -e "const fs = require('fs'); const { chromium } = require('playwright'); const path = chromium.executablePath(); if (!fs.existsSync(path)) { console.error('missing chromium executable: ' + path); process.exit(1); }" >/dev/null
+  test -f /opt/smartdox/themes/asciidoctor-pdf-ja.yml
+}
+
+check_kroki() {
+  require_command java
+  require_command curl
+  find_kroki_jar >/dev/null
+}
+
+check_video() {
+  require_command ffmpeg
+  require_command ffprobe
+  require_command node
+  require_command npm
+  require_command python3
+  python3 -c 'import PIL; print(PIL.__version__)' >/dev/null
+  node_with_global_modules -e "require.resolve('@remotion/renderer'); require.resolve('playwright')"
+  node_with_global_modules -e "const fs = require('fs'); const { chromium } = require('playwright'); const path = chromium.executablePath(); if (!fs.existsSync(path)) { console.error('missing chromium executable: ' + path); process.exit(1); }" >/dev/null
+  require_command whisper-cli
+  test -f "$TEXTUS_WHISPER_MODEL"
+}
+
+svg_pages_to_pdf() {
+  local out=""
+  local svg_files=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --out)
+        out="${2:?svg-pages-to-pdf --out requires a PDF path}"
+        shift 2
+        ;;
+      --out=*)
+        out="${1#--out=}"
+        shift
+        ;;
+      --help|-h)
+        cat <<'USAGE'
+Usage: svg-pages-to-pdf --out output.pdf page-001.svg [page-002.svg ...]
+
+Converts one or more SVG files into a single multi-page PDF using the
+Playwright/Chromium runtime bundled in the Textus toolchain image.
+USAGE
+        return 0
+        ;;
+      -*)
+        echo "svg-pages-to-pdf: unknown option: $1" >&2
+        return 2
+        ;;
+      *)
+        svg_files+=("$1")
+        shift
+        ;;
+    esac
+  done
+  if [[ -z "$out" ]]; then
+    echo "svg-pages-to-pdf: --out is required" >&2
+    return 2
+  fi
+  if [[ "${#svg_files[@]}" -eq 0 ]]; then
+    echo "svg-pages-to-pdf: at least one SVG file is required" >&2
+    return 2
+  fi
+  node_with_global_modules - "$out" "${svg_files[@]}" <<'NODE'
+const fs = require('fs');
+const path = require('path');
+const { chromium } = require('playwright');
+
+const out = process.argv[2];
+const inputs = process.argv.slice(3);
+
+function fail(message) {
+  console.error(`svg-pages-to-pdf: ${message}`);
+  process.exit(2);
+}
+
+if (!out) fail('--out is required');
+if (inputs.length === 0) fail('at least one SVG file is required');
+
+function parseLength(value) {
+  if (!value) return null;
+  const match = String(value).trim().match(/^([0-9]+(?:\.[0-9]+)?)(px|pt|mm|cm|in)?$/i);
+  if (!match) return null;
+  const n = Number(match[1]);
+  const unit = (match[2] || 'px').toLowerCase();
+  if (unit === 'px') return n;
+  if (unit === 'pt') return n * 96 / 72;
+  if (unit === 'mm') return n * 96 / 25.4;
+  if (unit === 'cm') return n * 96 / 2.54;
+  if (unit === 'in') return n * 96;
+  return null;
+}
+
+function pageSize(svg) {
+  const tag = svg.match(/<svg\b[^>]*>/i);
+  const head = tag ? tag[0] : '';
+  const attr = (name) => {
+    const re = new RegExp(`${name}\\s*=\\s*["']([^"']+)["']`, 'i');
+    const m = head.match(re);
+    return m ? m[1] : null;
+  };
+  const width = parseLength(attr('width'));
+  const height = parseLength(attr('height'));
+  if (width && height) return { width, height };
+  const viewBox = attr('viewBox');
+  if (viewBox) {
+    const parts = viewBox.trim().split(/[\s,]+/).map(Number);
+    if (parts.length === 4 && parts.every(Number.isFinite) && parts[2] > 0 && parts[3] > 0) {
+      return { width: parts[2], height: parts[3] };
+    }
+  }
+  return { width: 794, height: 1123 };
+}
+
+function escapeCssLength(value) {
+  return `${Math.max(1, Math.round(value * 1000) / 1000)}px`;
+}
+
+const pages = inputs.map((file) => {
+  if (!fs.existsSync(file)) fail(`SVG file not found: ${file}`);
+  const svg = fs.readFileSync(file, 'utf8');
+  return { file, svg, size: pageSize(svg) };
+});
+
+const first = pages[0].size;
+const html = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: ${escapeCssLength(first.width)} ${escapeCssLength(first.height)}; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  .page {
+    width: ${escapeCssLength(first.width)};
+    height: ${escapeCssLength(first.height)};
+    page-break-after: always;
+    break-after: page;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+  svg { max-width: 100%; max-height: 100%; display: block; }
+</style>
+</head>
+<body>
+${pages.map((page) => `<section class="page" data-source="${path.basename(page.file).replace(/"/g, '&quot;')}">${page.svg}</section>`).join('\n')}
+</body>
+</html>`;
+
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: Math.ceil(first.width), height: Math.ceil(first.height) } });
+    await page.setContent(html, { waitUntil: 'load' });
+    await page.pdf({
+      path: out,
+      printBackground: true,
+      preferCSSPageSize: true,
+      margin: { top: '0', right: '0', bottom: '0', left: '0' }
+    });
+  } finally {
+    await browser.close();
+  }
+})().catch((error) => {
+  console.error(`svg-pages-to-pdf: ${error && error.stack ? error.stack : error}`);
+  process.exit(1);
+});
+NODE
+}
+
+case "${1:-}" in
+  "")
+    exec bash
+    ;;
+  kroki-server)
+    shift
+    run_kroki_server "$@"
+    ;;
+  kroki-render)
+    shift
+    language="${1:?textus-toolchain kroki-render requires a diagram language}"
+    format="${2:-svg}"
+    start_kroki_server
+    source_file="$(mktemp)"
+    output_file="$(mktemp)"
+    cat > "$source_file"
+    for _ in $(seq 1 30); do
+      status="$(curl -sS \
+        -X POST \
+        -H 'Content-Type: text/plain; charset=UTF-8' \
+        --data-binary @"$source_file" \
+        -o "$output_file" \
+        -w '%{http_code}' \
+        "http://127.0.0.1:${SMARTDOX_KROKI_PORT}/${language}/${format}" || true)"
+      if [[ "$status" == "200" ]]; then
+        cat "$output_file"
+        rm -f "$source_file" "$output_file"
+        exit 0
+      fi
+      if [[ "$status" != "000" && "$status" != 5* ]]; then
+        if [[ -s "$output_file" ]]; then
+          cat "$output_file" >&2
+          printf '\n' >&2
+        fi
+        rm -f "$source_file" "$output_file"
+        echo "textus-toolchain: Kroki render failed for ${language}/${format}: HTTP ${status}" >&2
+        exit 1
+      fi
+      sleep 0.5
+    done
+    rm -f "$source_file" "$output_file"
+    echo "textus-toolchain: Kroki render failed for ${language}/${format}" >&2
+    exit 1
+    ;;
+  svg-pages-to-pdf)
+    shift
+    svg_pages_to_pdf "$@"
+    ;;
+  check)
+    target="${2:-all}"
+    case "$target" in
+      all)
+        check_kroki
+        check_bok
+        check_pdf
+        check_video
+        ;;
+      kroki)
+        check_kroki
+        ;;
+      bok)
+        check_bok
+        ;;
+      pdf)
+        check_pdf
+        ;;
+      video)
+        check_video
+        ;;
+      *)
+        echo "textus-toolchain: unknown check target: $target" >&2
+        exit 2
+        ;;
+    esac
+    echo "textus-toolchain check ${target}: ok"
+    ;;
+  antora)
+    SMARTDOX_KROKI_PORT="${SMARTDOX_KROKI_PORT:-9609}"
+    start_kroki_server
+    if "$@"; then
+      cleanup
+      exit 0
+    else
+      status="$?"
+      cleanup
+      exit "$status"
+    fi
+    ;;
+  *)
+    exec "$@"
+    ;;
+esac

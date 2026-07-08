@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Textus Toolchain Runner Component Developer Guide</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #f5f7fb;
+      --surface: #ffffff;
+      --ink: #172033;
+      --muted: #5d6b82;
+      --line: #d9e0ea;
+      --accent: #176b78;
+      --accent-soft: #e4f3f2;
+      --code: #102033;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 24px 64px;
+    }
+    header {
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 24px;
+    }
+    .eyebrow {
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 8px 0 12px;
+      font-size: clamp(2rem, 5vw, 3rem);
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 34px 0 12px;
+      font-size: 1.45rem;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 24px 0 8px;
+      font-size: 1.05rem;
+      letter-spacing: 0;
+    }
+    p {
+      margin: 0 0 14px;
+    }
+    a {
+      color: var(--accent);
+    }
+    .summary {
+      max-width: 720px;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+    .panel {
+      margin: 18px 0;
+      padding: 18px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .note {
+      background: var(--accent-soft);
+      border-color: #badcda;
+    }
+    dl {
+      display: grid;
+      grid-template-columns: minmax(160px, 240px) 1fr;
+      gap: 8px 16px;
+      margin: 0;
+    }
+    dt {
+      color: var(--muted);
+      font-weight: 700;
+    }
+    dd {
+      margin: 0;
+    }
+    code {
+      color: var(--code);
+      background: #e9eef5;
+      border-radius: 4px;
+      padding: 0.1em 0.35em;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+    pre {
+      overflow: auto;
+      margin: 12px 0 0;
+      padding: 14px;
+      background: #101927;
+      color: #eef6ff;
+      border-radius: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+    pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+    }
+    @media (max-width: 720px) {
+      main {
+        padding: 28px 16px 48px;
+      }
+      dl {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">Textus Component Developer Guide</div>
+      <h1>Textus Toolchain Runner</h1>
+      <p class="summary">
+        Textus Toolchain Runner owns the Textus toolchain Docker image and
+        exposes artifact conversion tools as CNCF component operations and as a
+        ToolchainRunner SPI provider.
+      </p>
+    </header>
+
+    <section class="panel note">
+      <h2>Document Routes</h2>
+      <p>
+        CNCF serves this guide as a component-packaged manual, separate from
+        generated CML/component help.
+      </p>
+      <pre><code>/man/{component}
+/man/{component}/user-guide.html
+/man/{component}/user-guide.md</code></pre>
+      <p>
+        The generated component specification is served at
+        <code>/help/{component}</code>. If a packaged PDF
+        is added as <code>docs/user-guide.pdf</code>, CNCF serves it at
+        <code>/man/{component}/user-guide.pdf</code>.
+      </p>
+      <pre><code>curl -fsS http://localhost:8080/man/textus-toolchain-runner/user-guide.md
+curl -fsS -o user-guide.pdf http://localhost:8080/man/textus-toolchain-runner/user-guide.pdf</code></pre>
+    </section>
+
+    <section class="panel note">
+      <h2>Source of Truth</h2>
+      <p>
+        This guide is the human-authored component developer manual for the
+        running component. The component specification is managed beside the
+        implementation in <code>src/main/cozy/textus-toolchain-runner.cml</code>.
+        The CML file is the operation contract for generated APIs, CAR
+        packaging, runtime integration, and component users.
+      </p>
+    </section>
+
+    <section>
+      <h2>Default Image</h2>
+      <div class="panel">
+        <dl>
+          <dt>Docker image</dt>
+          <dd><code>ghcr.io/asami/textus-toolchain:latest</code></dd>
+          <dt>Wrapper command</dt>
+          <dd><code>textus-toolchain</code></dd>
+          <dt>Main conversion command</dt>
+          <dd><code>svg-pages-to-pdf</code></dd>
+        </dl>
+      </div>
+      <p>
+        The image can be overridden by operation input or by runtime
+        configuration using <code>textus.toolchain-runner.docker.image</code>.
+      </p>
+    </section>
+
+    <section>
+      <h2>Component Operations</h2>
+      <h3>convertSvgToPdf</h3>
+      <p>Converts one SVG file into one PDF file through the toolchain image.</p>
+      <pre><code>textus-toolchain-runner convert-svg-to-pdf --svg input.svg --out output.pdf</code></pre>
+
+      <h3>convertSvgPagesToPdf</h3>
+      <p>Converts multiple SVG pages into one multi-page PDF.</p>
+      <pre><code>textus-toolchain-runner convert-svg-pages-to-pdf \
+  --svgFiles page-001.svg,page-002.svg \
+  --out print.pdf</code></pre>
+    </section>
+
+    <section>
+      <h2>When to Use the Component</h2>
+      <p>
+        Use the component or ToolchainRunner SPI when the caller runs inside
+        CNCF and needs structured operation results, CallTree/observability,
+        configured Docker command selection, and controlled workspace handling.
+      </p>
+      <p>
+        Sanpomap uses this path when it generates SVG pages and delegates PDF
+        conversion to ToolchainRunner.
+      </p>
+    </section>
+
+    <section>
+      <h2>Direct Docker Image Usage</h2>
+      <p>
+        Direct Docker use is for standalone CI jobs, local diagnosis, or tools
+        that only need the packaged command-line environment and do not run
+        inside CNCF.
+      </p>
+
+      <h3>Pull and Check</h3>
+      <pre><code>docker pull ghcr.io/asami/textus-toolchain:latest
+docker run --rm ghcr.io/asami/textus-toolchain:latest textus-toolchain check all</code></pre>
+
+      <h3>Convert SVG Pages to PDF</h3>
+      <pre><code>docker run --rm -v "$PWD:/work" -w /work \
+  ghcr.io/asami/textus-toolchain:latest \
+  svg-pages-to-pdf --out print.pdf page-001.svg page-002.svg</code></pre>
+
+      <h3>Run Installed Tools Directly</h3>
+      <p>
+        The wrapper passes through commands when no Textus-specific command
+        matches.
+      </p>
+      <pre><code>docker run --rm ghcr.io/asami/textus-toolchain:latest antora --version
+docker run --rm ghcr.io/asami/textus-toolchain:latest ffmpeg -version
+docker run --rm ghcr.io/asami/textus-toolchain:latest python3 -c 'import PIL; print(PIL.__version__)'</code></pre>
+    </section>
+
+    <section>
+      <h2>Image Builder Notes</h2>
+      <p>
+        Docker build, release tags, validation commands, and image digest notes
+        live with the Docker assets at <code>docker/textus-toolchain/README.md</code>.
+        That file is for image builders and maintainers. This user guide is the
+        runtime user manual.
+      </p>
+    </section>
+  </main>
+</body>
+</html>
