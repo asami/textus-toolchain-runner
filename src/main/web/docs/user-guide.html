@@ -199,6 +199,14 @@ curl -fsS -o user-guide.pdf http://localhost:8080/man/textus-toolchain-runner/us
       <pre><code>textus-toolchain-runner convert-svg-pages-to-pdf \
   --svgFiles page-001.svg,page-002.svg \
   --out print.pdf</code></pre>
+
+      <h3>renderWebPage</h3>
+      <p>
+        Renders one HTTP(S) page through Playwright/Chromium and returns
+        requested/final URL, status, title, rendered HTML, timestamp, engine,
+        and browser. CNCF components should call the ToolchainRunner SPI;
+        Textus Scraper is the standard rendered-HTML normalization boundary.
+      </p>
     </section>
 
     <section>
@@ -239,6 +247,23 @@ docker run --rm ghcr.io/asami/textus-toolchain:latest textus-toolchain check all
       <pre><code>docker run --rm ghcr.io/asami/textus-toolchain:latest antora --version
 docker run --rm ghcr.io/asami/textus-toolchain:latest ffmpeg -version
 docker run --rm ghcr.io/asami/textus-toolchain:latest python3 -c 'import PIL; print(PIL.__version__)'</code></pre>
+
+      <h3>Render a Web Page</h3>
+      <p>
+        Direct browser use is intended for deterministic CI and diagnosis.
+        Put the request in <code>request.json</code>; output is written only to
+        the requested response file.
+      </p>
+      <pre><code>{
+  "url": "https://example.org/application",
+  "waitUntil": "networkidle",
+  "waitForSelector": "#application",
+  "timeoutSeconds": 30
+}</code></pre>
+      <pre><code>docker run --rm -v "$PWD:/work" -w /work \
+  ghcr.io/asami/textus-toolchain:latest \
+  render-web-page request.json response.json</code></pre>
+      <p>Diagnostics use stderr. Rendered HTML is not written to stdout.</p>
     </section>
 
     <section>

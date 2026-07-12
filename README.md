@@ -70,6 +70,23 @@ Textus toolchain image and invokes the image-level `svg-pages-to-pdf` subcommand
 That subcommand is part of the toolchain image contract; the Textus component
 owns Docker invocation, workspace mounting, and operation results.
 
+### renderWebPage
+
+Renders one HTTP(S) page with Playwright/Chromium and returns structured page
+metadata and rendered HTML. CNCF components should call the provider-neutral
+`ToolchainRunner.renderWebPage` SPI; the Textus Scraper `RenderPage` operation
+is the standard HTML normalization boundary.
+
+```text
+TextusScraperApi.RenderPage
+  -> ToolchainRunner.renderWebPage
+  -> textus-toolchain-runner
+  -> Playwright/Chromium
+```
+
+The component passes request and response JSON through mounted files. URLs and
+rendered HTML are not placed in Docker command arguments or stdout.
+
 ## Sanpomap Integration
 
 Sanpomap can generate SVG pages and delegate PDF conversion to this component.

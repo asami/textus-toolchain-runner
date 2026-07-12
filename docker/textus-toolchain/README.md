@@ -111,6 +111,29 @@ docker run --rm -v "$PWD:/work" -w /work \
   svg-pages-to-pdf --out print.pdf page-001.svg page-002.svg
 ```
 
+The image also exposes the low-level Playwright command used by
+`textus-toolchain-runner`. CNCF callers should prefer ToolchainRunner SPI or
+Textus Scraper. Direct use is intended for deterministic CI and diagnosis:
+
+```json
+{
+  "url": "https://example.org/application",
+  "waitUntil": "networkidle",
+  "waitForSelector": "#application",
+  "timeoutSeconds": 30
+}
+```
+
+```bash
+docker run --rm -v "$PWD:/work" -w /work \
+  ghcr.io/asami/textus-toolchain:latest \
+  render-web-page request.json response.json
+```
+
+The response file contains requested/final URL, status, title, rendered HTML,
+timestamp, engine, and browser. Diagnostics go to stderr. The command emits no
+rendered HTML on stdout.
+
 VOICEVOX Engine is not included. Cozy checks and uses VOICEVOX as an external HTTP service.
 
 The v1 image includes whisper.cpp and the standard model at:

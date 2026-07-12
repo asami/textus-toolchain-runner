@@ -90,6 +90,13 @@ textus-toolchain-runner convert-svg-pages-to-pdf \
   --out print.pdf
 ```
 
+### renderWebPage
+
+Renders one HTTP(S) page through Playwright/Chromium and returns requested and
+final URL, status, title, rendered HTML, timestamp, engine, and browser. CNCF
+components should call the ToolchainRunner SPI. Textus Scraper is the standard
+rendered-HTML normalization boundary.
+
 ## When to Use the Component
 
 Use the component or ToolchainRunner SPI when the caller runs inside CNCF and
@@ -128,6 +135,27 @@ docker run --rm ghcr.io/asami/textus-toolchain:latest python3 -c 'import PIL; pr
 ```
 
 The wrapper passes through commands when no Textus-specific command matches.
+
+Render a Web page directly for deterministic CI or diagnosis by placing the
+request in `request.json`:
+
+```json
+{
+  "url": "https://example.org/application",
+  "waitUntil": "networkidle",
+  "waitForSelector": "#application",
+  "timeoutSeconds": 30
+}
+```
+
+```sh
+docker run --rm -v "$PWD:/work" -w /work \
+  ghcr.io/asami/textus-toolchain:latest \
+  render-web-page request.json response.json
+```
+
+Diagnostics use stderr. Rendered HTML is written only to the response file,
+not stdout.
 
 ## Image Builder Notes
 
