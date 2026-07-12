@@ -76,5 +76,17 @@ final class PlaywrightRenderLogicSpec extends AnyWordSpec with Matchers with Giv
       Then("each invalid browser request is rejected deterministically")
       results.forall(_.isLeft) shouldBe true
     }
+
+    "reject malformed browser response output" in {
+      Given("a response file that is not valid JSON")
+      val responsefile = Files.createTempFile("playwright-render-invalid-response", ".json")
+      Files.writeString(responsefile, "not-json", StandardCharsets.UTF_8)
+
+      When("the tool response is decoded")
+      val result = PlaywrightRenderLogic.parseResponse(responsefile)
+
+      Then("the malformed provider output fails deterministically")
+      result shouldBe Left("render response is not valid JSON")
+    }
   }
 }
