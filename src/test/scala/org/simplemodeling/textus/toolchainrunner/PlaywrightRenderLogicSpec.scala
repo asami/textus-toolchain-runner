@@ -21,7 +21,9 @@ final class PlaywrightRenderLogicSpec extends AnyWordSpec with Matchers with Giv
         "https://museum.example/exhibitions?token=secret",
         Some("networkidle"),
         Some("#exhibitions"),
-        Some(45)
+        Some(45),
+        Some("Mozilla/5.0 Chrome/138.0.0.0"),
+        Some("reviewed_site_compatibility")
       )
 
       When("the deterministic toolchain command is prepared")
@@ -37,6 +39,8 @@ final class PlaywrightRenderLogicSpec extends AnyWordSpec with Matchers with Giv
       requestjson should include("museum.example")
       requestjson should include("networkidle")
       requestjson should include("#exhibitions")
+      requestjson should include("Mozilla/5.0 Chrome/138.0.0.0")
+      requestjson should include("reviewed_site_compatibility")
 
       And("the structured request workspace can be removed after execution")
       PlaywrightRenderLogic.cleanup(prepared, removework = true)
@@ -67,7 +71,10 @@ final class PlaywrightRenderLogicSpec extends AnyWordSpec with Matchers with Giv
       val requests = Vector(
         PlaywrightRenderRequest("file:///tmp/page.html", None, None, None),
         PlaywrightRenderRequest("https://museum.example/", Some("forever"), None, None),
-        PlaywrightRenderRequest("https://museum.example/", None, None, Some(121))
+        PlaywrightRenderRequest("https://museum.example/", None, None, Some(121)),
+        PlaywrightRenderRequest("https://museum.example/", None, None, None, Some("bad\nagent")),
+        PlaywrightRenderRequest("https://museum.example/", None, None, None, None, Some("unknown")),
+        PlaywrightRenderRequest("https://museum.example/", None, None, None, Some("MuseumBrowser/1.0"), Some("reviewed_site_compatibility"))
       )
 
       When("the requests are validated")

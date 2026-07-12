@@ -1,3 +1,8 @@
+/*
+ * @since   Jul.  4, 2026
+ * @version Jul. 12, 2026
+ * @author  ASAMI, Tomoharu
+ */
 package org.simplemodeling.textus.toolchainrunner.impl
 
 import org.goldenport.Consequence
@@ -53,7 +58,9 @@ final class TextusToolchainRunner(
         "url" -> Some(req.url),
         "waitUntil" -> req.waitUntil,
         "waitForSelector" -> req.waitForSelector,
-        "timeoutSeconds" -> req.timeoutSeconds.map(_.toString)
+        "timeoutSeconds" -> req.timeoutSeconds.map(_.toString),
+        "userAgent" -> req.userAgent,
+        "browserProfile" -> req.browserProfile
       )
     ).flatMap(_to_rendered_web_page_response)
 

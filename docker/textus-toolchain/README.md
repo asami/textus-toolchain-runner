@@ -120,19 +120,27 @@ Textus Scraper. Direct use is intended for deterministic CI and diagnosis:
   "url": "https://example.org/application",
   "waitUntil": "networkidle",
   "waitForSelector": "#application",
-  "timeoutSeconds": 30
+  "timeoutSeconds": 30,
+  "userAgent": "MuseumBrowser/1.0",
+  "browserProfile": "standard"
 }
 ```
 
 ```bash
 docker run --rm -v "$PWD:/work" -w /work \
   ghcr.io/asami/textus-toolchain:latest \
-  render-web-page request.json response.json
+  render-web-page --request request.json --response response.json
 ```
 
 The response file contains requested/final URL, status, title, rendered HTML,
 timestamp, engine, and browser. Diagnostics go to stderr. The command emits no
 rendered HTML on stdout.
+
+The request may include `userAgent`, which the standard profile applies
+literally. A reviewed source may explicitly select
+`browserProfile: reviewed_site_compatibility`; only that profile aligns Chromium
+client hints and reduces automation disclosure without exposing raw headers or
+launch arguments to the application component.
 
 VOICEVOX Engine is not included. Cozy checks and uses VOICEVOX as an external HTTP service.
 

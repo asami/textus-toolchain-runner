@@ -1,3 +1,8 @@
+/*
+ * @since   Jul.  2, 2026
+ * @version Jul. 12, 2026
+ * @author  ASAMI, Tomoharu
+ */
 package org.simplemodeling.textus.toolchainrunner.impl
 
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
@@ -143,7 +148,9 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
         action.record.getString("url").getOrElse(""),
         action.record.getString("waitUntil").filter(_.nonEmpty),
         action.record.getString("waitForSelector").filter(_.nonEmpty),
-        action.record.getInt("timeoutSeconds")
+        action.record.getInt("timeoutSeconds"),
+        action.record.getString("userAgent").filter(_.nonEmpty),
+        action.record.getString("browserProfile").filter(_.nonEmpty)
       )
       val dockerimage = _docker_image(action.record.getString("dockerImage"), config_string)
       val dockercommand = action.record.getString("dockerCommand").filter(_.nonEmpty).getOrElse("docker")

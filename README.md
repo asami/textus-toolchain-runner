@@ -77,6 +77,12 @@ metadata and rendered HTML. CNCF components should call the provider-neutral
 `ToolchainRunner.renderWebPage` SPI; the Textus Scraper `RenderPage` operation
 is the standard HTML normalization boundary.
 
+An optional User-Agent is propagated literally as browser context
+configuration. A caller may additionally select the explicit
+`reviewed_site_compatibility` browser profile when a reviewed source requires
+coherent Chromium client hints and reduced automation disclosure. The standard
+profile does not change browser process flags.
+
 ```text
 TextusScraperApi.RenderPage
   -> ToolchainRunner.renderWebPage
@@ -104,5 +110,6 @@ Sanpomap renderScenarioPrintPdf
 
 ```sh
 sbt test
+scripts/check-render-web-page-browser-profile.sh
 scripts/update-runtime-classpath.sh
 ```

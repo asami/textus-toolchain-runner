@@ -325,12 +325,43 @@ const waitUntil = request.waitUntil || 'load';
 if (!waitModes.has(waitUntil)) fail('waitUntil is unsupported');
 const timeoutSeconds = Number(request.timeoutSeconds || 30);
 if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 120) fail('timeoutSeconds is invalid');
+const userAgent = request.userAgent == null ? undefined : String(request.userAgent).trim();
+if (userAgent && (userAgent.length > 512 || /[\u0000-\u001f\u007f]/.test(userAgent))) fail('userAgent is invalid');
+const browserProfile = request.browserProfile || 'standard';
+if (!['standard', 'reviewed_site_compatibility'].includes(browserProfile)) fail('browserProfile is unsupported');
+if (browserProfile === 'reviewed_site_compatibility' && !(userAgent && /Chrome\/\d+/.test(userAgent))) {
+  fail('reviewed_site_compatibility requires a Google Chrome userAgent');
+}
+
+function reviewedCompatibilityContext(value) {
+  const chromeVersion = value.match(/Chrome\/(\d+)/);
+  const platform = value.includes('Macintosh') ? 'macOS' : value.includes('Windows') ? 'Windows' : 'Linux';
+  const options = { userAgent: value };
+  if (chromeVersion) {
+    const version = chromeVersion[1];
+    options.extraHTTPHeaders = {
+      'sec-ch-ua': `"Not)A;Brand";v="8", "Chromium";v="${version}", "Google Chrome";v="${version}"`,
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': `"${platform}"`
+    };
+  }
+  return options;
+}
+
+function browserContextOptions(value, profile) {
+  if (!value) return {};
+  if (profile === 'reviewed_site_compatibility') return reviewedCompatibilityContext(value);
+  return { userAgent: value };
+}
 
 (async () => {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    args: browserProfile === 'reviewed_site_compatibility' ? ['--disable-blink-features=AutomationControlled'] : []
+  });
   let context;
   try {
-    context = await browser.newContext();
+    context = await browser.newContext(browserContextOptions(userAgent, browserProfile));
     const page = await context.newPage();
     const navigation = await page.goto(parsedUrl.toString(), {
       waitUntil,

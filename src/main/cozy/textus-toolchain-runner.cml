@@ -168,6 +168,8 @@ QueryAction
 | waitUntil       | string | ?            |
 | waitForSelector | string | ?            |
 | timeoutSeconds  | int    | ?            |
+| userAgent       | string | ?            |
+| browserProfile  | string | ?            |
 | dockerImage     | string | ?            |
 | dockerCommand   | string | ?            |
 | workDir         | string | ?            |

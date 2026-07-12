@@ -1,3 +1,8 @@
+/*
+ * @since   Jul.  2, 2026
+ * @version Jul. 12, 2026
+ * @author  ASAMI, Tomoharu
+ */
 package org.simplemodeling.textus.toolchainrunner
 
 import java.nio.charset.StandardCharsets
@@ -138,6 +143,10 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
       script should include("render-web-page")
       script should include("request JSON is invalid")
       script should include("browser rendering failed")
+      script should include("browserContextOptions")
+      script should include("reviewedCompatibilityContext")
+      script should include("sec-ch-ua-platform")
+      script should include("AutomationControlled")
       script should include("Usage: svg-pages-to-pdf --out output.pdf")
       script should include("SVG file not found")
       script should include("preferCSSPageSize")
