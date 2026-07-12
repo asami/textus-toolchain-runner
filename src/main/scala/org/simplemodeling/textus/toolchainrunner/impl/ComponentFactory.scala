@@ -2,7 +2,7 @@ package org.simplemodeling.textus.toolchainrunner.impl
 
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 import scala.util.Try
-import cats.syntax.functor.*
+import cats.syntax.all.*
 import org.goldenport.cncf.action.{ActionCall, ActionCallShellCommandPart}
 import org.goldenport.cncf.component.{Component, ComponentCreate, ComponentId}
 import org.goldenport.cncf.unitofwork.ExecUowM
@@ -65,8 +65,8 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
 
   private final case class ToolchainRunResult(
     out: Path,
-    pageCount: Int,
-    dockerImage: String
+    pagecount: Int,
+    dockerimage: String
   )
 
   override def createConvertSvgToPdfActionCall(
@@ -80,6 +80,12 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
     action: ConvertSvgPagesToPdfQuery
   ): ConvertSvgPagesToPdfActionCall =
     ConvertSvgPagesToPdfActionCallImpl(core, action)
+
+  override def createRenderWebPageActionCall(
+    core: ActionCall.Core,
+    action: RenderWebPageQuery
+  ): RenderWebPageActionCall =
+    RenderWebPageActionCallImpl(core, action)
 
   private final case class ConvertSvgToPdfActionCallImpl(
     core: ActionCall.Core,
@@ -128,6 +134,41 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
     }
   }
 
+  private final case class RenderWebPageActionCallImpl(
+    core: ActionCall.Core,
+    override val action: RenderWebPageQuery
+  ) extends RenderWebPageActionCall with ActionCallShellCommandPart {
+    protected def build_Program: ExecUowM[OperationResponse] = {
+      val request = PlaywrightRenderRequest(
+        action.record.getString("url").getOrElse(""),
+        action.record.getString("waitUntil").filter(_.nonEmpty),
+        action.record.getString("waitForSelector").filter(_.nonEmpty),
+        action.record.getInt("timeoutSeconds")
+      )
+      val dockerimage = _docker_image(action.record.getString("dockerImage"), config_string)
+      val dockercommand = action.record.getString("dockerCommand").filter(_.nonEmpty).getOrElse("docker")
+      val configuredwork = action.record.getString("workDir").filter(_.nonEmpty).map(Paths.get(_))
+      val work = configuredwork.getOrElse(Files.createTempDirectory("textus-toolchain-render-"))
+      PlaywrightRenderLogic.prepare(request, dockerimage, dockercommand, work) match {
+        case Left(message) =>
+          exec_from(org.goldenport.Consequence.resourceInvalid(message))
+        case Right(prepared) =>
+          shell_exec(ShellCommand(prepared.command, Some(prepared.work))).flatMap { result =>
+            val response =
+              if (result.exitCode != 0)
+                org.goldenport.Consequence.serviceUnavailable(s"Playwright render command failed with exit ${result.exitCode}")
+              else
+                PlaywrightRenderLogic.parseResponse(prepared.responseFile) match {
+                  case Right(value) => org.goldenport.Consequence.success(_render_response(value))
+                  case Left(message) => org.goldenport.Consequence.operationInvalid(message)
+                }
+            PlaywrightRenderLogic.cleanup(prepared, configuredwork.isEmpty)
+            exec_from(response)
+          }
+      }
+    }
+  }
+
   private def _convert_svg_pages_to_pdf(
     svgfiles: Vector[String],
     out: Path,
@@ -135,7 +176,7 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
     dockercommand: String,
     workdir: Option[Path],
     pure: Either[String, ToolchainRunResult] => ExecUowM[Either[String, ToolchainRunResult]],
-    runShell: (Vector[String], Path) => ExecUowM[Either[String, String]]
+    runshell: (Vector[String], Path) => ExecUowM[Either[String, String]]
   ): ExecUowM[Either[String, ToolchainRunResult]] = {
     val inputs = svgfiles.map(s => Paths.get(s).toAbsolutePath.normalize)
     val validation: Either[String, Vector[Path]] =
@@ -145,12 +186,12 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
         inputs.find(path => !Files.isRegularFile(path)).
           map(path => Left(s"SVG file not found: ${path.toString}")).
           getOrElse(Right(inputs))
-    validation.flatMap { checkedInputs =>
+    validation.flatMap { checkedinputs =>
       Try {
         val work = workdir.map(_.toAbsolutePath.normalize).
           getOrElse(Files.createTempDirectory("textus-toolchain-runner-"))
         Files.createDirectories(work)
-        val pages = checkedInputs.zipWithIndex.map { case (input, index) =>
+        val pages = checkedinputs.zipWithIndex.map { case (input, index) =>
           val target = work.resolve(f"page-${index + 1}%03d.svg")
           Files.copy(input, target, StandardCopyOption.REPLACE_EXISTING)
           target.getFileName.toString
@@ -174,7 +215,7 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
     } match {
       case Left(message) => pure(Left(message))
       case Right((command, work, workout, pagecount)) =>
-        runShell(command, work).map { result =>
+        runshell(command, work).map { result =>
           result.flatMap { _ =>
             if (!Files.isRegularFile(workout))
               Left("toolchain did not create output.pdf")
@@ -250,8 +291,8 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
           "warningCount" -> 0,
           "message" -> s"created PDF: ${value.out.toString}",
           "out" -> value.out.toString,
-          "pageCount" -> value.pageCount,
-          "dockerImage" -> value.dockerImage
+          "pageCount" -> value.pagecount,
+          "dockerImage" -> value.dockerimage
         ))
       case Left(message) =>
         OperationResponse.RecordResponse(Record.data(
@@ -264,6 +305,18 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
           "dockerImage" -> ""
         ))
     }
+
+  private def _render_response(response: PlaywrightRenderResponse): OperationResponse =
+    OperationResponse.RecordResponse(Record.data(
+      "requestedUrl" -> response.requestedUrl,
+      "finalUrl" -> response.finalUrl,
+      "status" -> response.status,
+      "title" -> response.title,
+      "html" -> response.html,
+      "renderedAt" -> response.renderedAt,
+      "engine" -> response.engine,
+      "browser" -> response.browser
+    ))
 }
 
 object DefaultToolchainServiceFactory {

@@ -27,6 +27,8 @@ lazy val root = project
     cozyDelegateProjectDir := None,
     cozyDelegateCommand := Seq("cozy"),
     cozyManifestMetadata ++= Map(
+      "name" -> "textus-toolchain-runner",
+      "version" -> "0.2.0-SNAPSHOT",
       "component" -> "textus-toolchain-runner",
       "boundedContext" -> "default",
       "domain" -> "default"

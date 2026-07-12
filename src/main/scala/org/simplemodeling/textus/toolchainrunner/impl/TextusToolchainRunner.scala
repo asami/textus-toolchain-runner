@@ -16,7 +16,7 @@ import org.simplemodeling.textus.toolchainrunner.ToolchainRunnerComponent
  * component operations.
  *
  * @since   Jul.  3, 2026
- * @version Jul.  3, 2026
+ * @version Jul. 12, 2026
  * @author  ASAMI, Tomoharu
  */
 final class TextusToolchainRunner(
@@ -45,6 +45,17 @@ final class TextusToolchainRunner(
         "workDir" -> req.workDir
       )
     ).map(_to_response)
+
+  override def renderWebPage(req: RenderWebPageRequest)(using ExecutionContext): Consequence[RenderedWebPageResponse] =
+    _operation_record(
+      "renderWebPage",
+      _properties(
+        "url" -> Some(req.url),
+        "waitUntil" -> req.waitUntil,
+        "waitForSelector" -> req.waitForSelector,
+        "timeoutSeconds" -> req.timeoutSeconds.map(_.toString)
+      )
+    ).flatMap(_to_rendered_web_page_response)
 
   private def _operation_record(
     operation: String,
@@ -84,6 +95,25 @@ final class TextusToolchainRunner(
       out = record.getString("out").filter(_.nonEmpty),
       pageCount = record.getInt("pageCount").getOrElse(0),
       dockerImage = record.getString("dockerImage").filter(_.nonEmpty)
+    )
+
+  private def _to_rendered_web_page_response(record: Record): Consequence[RenderedWebPageResponse] =
+    for {
+      requestedurl <- record.getString("requestedUrl").toRight("renderWebPage response requestedUrl is missing").fold(Consequence.operationInvalid, Consequence.success)
+      finalurl <- record.getString("finalUrl").toRight("renderWebPage response finalUrl is missing").fold(Consequence.operationInvalid, Consequence.success)
+      html <- record.getString("html").toRight("renderWebPage response html is missing").fold(Consequence.operationInvalid, Consequence.success)
+      renderedat <- record.getString("renderedAt").toRight("renderWebPage response renderedAt is missing").fold(Consequence.operationInvalid, Consequence.success)
+      engine <- record.getString("engine").toRight("renderWebPage response engine is missing").fold(Consequence.operationInvalid, Consequence.success)
+      browser <- record.getString("browser").toRight("renderWebPage response browser is missing").fold(Consequence.operationInvalid, Consequence.success)
+    } yield RenderedWebPageResponse(
+      requestedurl,
+      finalurl,
+      record.getInt("status"),
+      record.getString("title").filter(_.nonEmpty),
+      html,
+      renderedat,
+      engine,
+      browser
     )
 }
 

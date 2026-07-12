@@ -262,6 +262,105 @@ ${pages.map((page) => `<section class="page" data-source="${path.basename(page.f
 NODE
 }
 
+render_web_page() {
+  local request=""
+  local response=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --request)
+        request="${2:?render-web-page --request requires a JSON path}"
+        shift 2
+        ;;
+      --response)
+        response="${2:?render-web-page --response requires a JSON path}"
+        shift 2
+        ;;
+      --help|-h)
+        cat <<'USAGE'
+Usage: render-web-page --request request.json --response response.json
+
+Renders one HTTP(S) page with Playwright/Chromium. Structured payloads use
+files so URLs and rendered HTML are not written to command output.
+USAGE
+        return 0
+        ;;
+      *)
+        echo "render-web-page: unknown option" >&2
+        return 2
+        ;;
+    esac
+  done
+  if [[ -z "$request" || -z "$response" ]]; then
+    echo "render-web-page: --request and --response are required" >&2
+    return 2
+  fi
+  node_with_global_modules - "$request" "$response" <<'NODE'
+const fs = require('fs');
+const { chromium } = require('playwright');
+
+const requestPath = process.argv[2];
+const responsePath = process.argv[3];
+
+function fail(message) {
+  console.error(`render-web-page: ${message}`);
+  process.exit(2);
+}
+
+let request;
+try {
+  request = JSON.parse(fs.readFileSync(requestPath, 'utf8'));
+} catch (_) {
+  fail('request JSON is invalid');
+}
+
+const waitModes = new Set(['load', 'domcontentloaded', 'networkidle']);
+let parsedUrl;
+try {
+  parsedUrl = new URL(String(request.url || ''));
+} catch (_) {
+  fail('request URL is invalid');
+}
+if (!['http:', 'https:'].includes(parsedUrl.protocol)) fail('request URL must use HTTP or HTTPS');
+const waitUntil = request.waitUntil || 'load';
+if (!waitModes.has(waitUntil)) fail('waitUntil is unsupported');
+const timeoutSeconds = Number(request.timeoutSeconds || 30);
+if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 120) fail('timeoutSeconds is invalid');
+
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  let context;
+  try {
+    context = await browser.newContext();
+    const page = await context.newPage();
+    const navigation = await page.goto(parsedUrl.toString(), {
+      waitUntil,
+      timeout: timeoutSeconds * 1000
+    });
+    if (request.waitForSelector) {
+      await page.waitForSelector(String(request.waitForSelector), { timeout: timeoutSeconds * 1000 });
+    }
+    const result = {
+      requestedUrl: parsedUrl.toString(),
+      finalUrl: page.url(),
+      status: navigation ? navigation.status() : null,
+      title: await page.title(),
+      html: await page.content(),
+      renderedAt: new Date().toISOString(),
+      engine: 'playwright',
+      browser: 'chromium'
+    };
+    fs.writeFileSync(responsePath, JSON.stringify(result), 'utf8');
+  } finally {
+    if (context) await context.close();
+    await browser.close();
+  }
+})().catch(() => {
+  console.error('render-web-page: browser rendering failed');
+  process.exit(1);
+});
+NODE
+}
+
 case "${1:-}" in
   "")
     exec bash
@@ -309,6 +408,10 @@ case "${1:-}" in
   svg-pages-to-pdf)
     shift
     svg_pages_to_pdf "$@"
+    ;;
+  render-web-page)
+    shift
+    render_web_page "$@"
     ;;
   check)
     target="${2:-all}"

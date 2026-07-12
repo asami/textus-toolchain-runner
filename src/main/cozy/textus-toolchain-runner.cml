@@ -136,3 +136,64 @@ OperationResult
 | out          | string  | 1            |
 | pageCount    | int     | 1            |
 | dockerImage  | string  | 1            |
+
+#### renderWebPage
+
+Renders one JavaScript-driven Web page with the browser runtime in the Textus
+toolchain image. The request and response payloads are exchanged through files
+so URLs and rendered HTML do not appear in process arguments or stdout.
+
+##### TYPE
+
+QUERY
+
+##### INPUT
+
+###### TYPE
+RenderWebPageQuery
+
+###### VALUE
+
+####### RenderWebPageQuery
+
+######## EXTENDS
+
+QueryAction
+
+######## ATTRIBUTE
+
+| name            | type   | multiplicity |
+|-----------------+--------+--------------|
+| url             | string | 1            |
+| waitUntil       | string | ?            |
+| waitForSelector | string | ?            |
+| timeoutSeconds  | int    | ?            |
+| dockerImage     | string | ?            |
+| dockerCommand   | string | ?            |
+| workDir         | string | ?            |
+
+##### OUTPUT
+
+###### TYPE
+RenderedWebPageResult
+
+###### VALUE
+
+####### RenderedWebPageResult
+
+######## EXTENDS
+
+OperationResult
+
+######## ATTRIBUTE
+
+| name         | type   | multiplicity | confidentiality |
+|--------------+--------+--------------+-----------------|
+| requestedUrl | string | 1            |                 |
+| finalUrl     | string | 1            |                 |
+| status       | int    | ?            |                 |
+| title        | string | ?            |                 |
+| html         | string | 1            | sensitive       |
+| renderedAt   | string | 1            |                 |
+| engine       | string | 1            |                 |
+| browser      | string | 1            |                 |
