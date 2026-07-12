@@ -1,8 +1,7 @@
 import org.goldenport.cozy.CozyPlugin.autoImport._
 import sbt.Keys.*
 
-val scala3Version = "3.3.8"
-val cncfVersion = "0.5.0-SNAPSHOT"
+val cncfVersion = "0.5.0"
 
 lazy val root = project
   .in(file("."))
@@ -10,9 +9,9 @@ lazy val root = project
   .settings(
     organization := "org.simplemodeling.textus",
     name := "textus-toolchain-runner",
-    version := "0.2.0-SNAPSHOT",
+    version := "0.2.0",
 
-    scalaVersion := scala3Version,
+    scalaVersion := "3.3.8",
     useCoursier := false,
 
     resolvers += Resolver.defaultLocal,
@@ -20,7 +19,7 @@ lazy val root = project
     resolvers += "Local Maven Repository" at ("file://" + Path.userHome.absolutePath + "/.m2/repository"),
     resolvers += "SimpleModeling.org" at "https://www.simplemodeling.org/repository/maven",
 
-    libraryDependencies += "org.goldenport" %% "goldenport-cncf" % cncfVersion,
+    libraryDependencies += "org.goldenport" % "goldenport-cncf_3" % cncfVersion,
     libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.10" % Test,
 
     cozyGeneratorBackend := "cozy",
@@ -28,7 +27,7 @@ lazy val root = project
     cozyDelegateCommand := Seq("cozy"),
     cozyManifestMetadata ++= Map(
       "name" -> "textus-toolchain-runner",
-      "version" -> "0.2.0-SNAPSHOT",
+      "version" -> "0.2.0",
       "component" -> "textus-toolchain-runner",
       "boundedContext" -> "default",
       "domain" -> "default"
