@@ -9,7 +9,7 @@ lazy val root = project
   .settings(
     organization := "org.simplemodeling.textus",
     name := "textus-toolchain-runner",
-    version := "0.2.0",
+    version := "0.2.1-SNAPSHOT",
 
     scalaVersion := "3.3.8",
     useCoursier := false,
@@ -27,7 +27,7 @@ lazy val root = project
     cozyDelegateCommand := Seq("cozy"),
     cozyManifestMetadata ++= Map(
       "name" -> "textus-toolchain-runner",
-      "version" -> "0.2.0",
+      "version" -> "0.2.1-SNAPSHOT",
       "component" -> "textus-toolchain-runner",
       "boundedContext" -> "default",
       "domain" -> "default"

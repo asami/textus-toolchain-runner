@@ -1,6 +1,11 @@
 ARG KROKI_IMAGE=yuzutech/kroki:latest
 FROM ${KROKI_IMAGE}
 
+ARG ANTORA_VERSION=3.1.15
+ARG ASCIIDOCTOR_KROKI_VERSION=0.18.1
+ARG PLAYWRIGHT_VERSION=1.61.1
+ARG REMOTION_VERSION=4.0.490
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
 ENV TEXTUS_WHISPER_MODEL=/opt/textus/models/ggml-base.bin
@@ -63,12 +68,14 @@ RUN apt-get update \
 RUN gem install --no-document asciidoctor asciidoctor-pdf
 
 RUN npm install -g \
-    @antora/cli \
-    @antora/site-generator \
-    asciidoctor-kroki \
-    playwright \
-    remotion \
-    @remotion/renderer \
+    "@antora/cli@${ANTORA_VERSION}" \
+    "@antora/site-generator@${ANTORA_VERSION}" \
+    "asciidoctor-kroki@${ASCIIDOCTOR_KROKI_VERSION}" \
+    "playwright@${PLAYWRIGHT_VERSION}" \
+    "remotion@${REMOTION_VERSION}" \
+    "@remotion/cli@${REMOTION_VERSION}" \
+    "@remotion/renderer@${REMOTION_VERSION}" \
+  && remotion versions \
   && npx playwright install chromium
 
 RUN set -eux; \

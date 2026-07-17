@@ -1,6 +1,6 @@
 /*
  * @since   Jul.  2, 2026
- * @version Jul. 12, 2026
+ * @version Jul. 18, 2026
  * @author  ASAMI, Tomoharu
  */
 package org.simplemodeling.textus.toolchainrunner
@@ -122,10 +122,16 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
 
       Then("the Dockerfile includes the BoK, PDF, and video runtime dependencies")
       dockerfile should include("asciidoctor-pdf")
+      dockerfile should include("ARG ANTORA_VERSION=3.1.15")
+      dockerfile should include("ARG ASCIIDOCTOR_KROKI_VERSION=0.18.1")
+      dockerfile should include("ARG PLAYWRIGHT_VERSION=1.61.1")
+      dockerfile should include("ARG REMOTION_VERSION=4.0.490")
       dockerfile should include("@antora/cli")
       dockerfile should include("ffmpeg")
       dockerfile should include("playwright")
+      dockerfile should include("@remotion/cli")
       dockerfile should include("@remotion/renderer")
+      dockerfile should include("remotion versions")
       dockerfile should include("python3-pil")
       dockerfile should include("whisper.cpp")
       dockerfile should include("ggml-base.bin")
@@ -137,6 +143,9 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
       script should include("check_pdf")
       script should include("check_kroki")
       script should include("check_video")
+      script should include("require_command remotion")
+      script should include("require.resolve('@remotion/cli')")
+      script should include("remotion versions")
       script should include("svg_pages_to_pdf")
       script should include("svg-pages-to-pdf")
       script should include("render_web_page")

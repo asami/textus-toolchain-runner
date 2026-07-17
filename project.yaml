@@ -8,7 +8,7 @@ project:
     name: "textus-toolchain-runner"
     className: "ToolchainRunner"
     displayName: "Textus Toolchain Runner"
-    version: "0.2.0"
+    version: "0.2.1-SNAPSHOT"
 
 publication:
   source_manifest:

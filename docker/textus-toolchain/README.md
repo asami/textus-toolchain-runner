@@ -58,6 +58,12 @@ docker run --rm ghcr.io/asami/textus-toolchain:latest textus-toolchain check pdf
 docker run --rm ghcr.io/asami/textus-toolchain:latest textus-toolchain check video
 ```
 
+The video check requires the Remotion CLI and verifies that `remotion`,
+`@remotion/cli`, and `@remotion/renderer` use one compatible version.
+Docker build arguments pin the Antora, Asciidoctor Kroki, Playwright, and
+Remotion npm dependency families so rebuilding the image does not silently
+change its runtime contract.
+
 Release:
 
 ```bash

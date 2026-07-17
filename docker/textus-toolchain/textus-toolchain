@@ -105,9 +105,11 @@ check_video() {
   require_command ffprobe
   require_command node
   require_command npm
+  require_command remotion
+  remotion versions >/dev/null
   require_command python3
   python3 -c 'import PIL; print(PIL.__version__)' >/dev/null
-  node_with_global_modules -e "require.resolve('@remotion/renderer'); require.resolve('playwright')"
+  node_with_global_modules -e "require.resolve('@remotion/cli'); require.resolve('@remotion/renderer'); require.resolve('playwright')"
   node_with_global_modules -e "const fs = require('fs'); const { chromium } = require('playwright'); const path = chromium.executablePath(); if (!fs.existsSync(path)) { console.error('missing chromium executable: ' + path); process.exit(1); }" >/dev/null
   require_command whisper-cli
   test -f "$TEXTUS_WHISPER_MODEL"
