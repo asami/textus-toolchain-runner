@@ -3,6 +3,7 @@ set -euo pipefail
 
 SMARTDOX_KROKI_PORT="${SMARTDOX_KROKI_PORT:-8000}"
 TEXTUS_WHISPER_MODEL="${TEXTUS_WHISPER_MODEL:-/opt/textus/models/ggml-base.bin}"
+TEXTUS_PIPER_MANIFEST="${TEXTUS_PIPER_MANIFEST:-/opt/textus/models/piper/manifest.json}"
 KROKI_PID=""
 
 find_kroki_jar() {
@@ -113,6 +114,152 @@ check_video() {
   node_with_global_modules -e "const fs = require('fs'); const { chromium } = require('playwright'); const path = chromium.executablePath(); if (!fs.existsSync(path)) { console.error('missing chromium executable: ' + path); process.exit(1); }" >/dev/null
   require_command whisper-cli
   test -f "$TEXTUS_WHISPER_MODEL"
+  check_tts
+}
+
+check_tts() {
+  require_command ffmpeg
+  require_command ffprobe
+  test -x /opt/piper/bin/python
+  test -f "$TEXTUS_PIPER_MANIFEST"
+  test -f /opt/textus/licenses/piper-COPYING
+  /opt/piper/bin/python - "$TEXTUS_PIPER_MANIFEST" <<'PY'
+import hashlib
+import importlib.metadata
+import json
+import pathlib
+import sys
+
+manifest_path = pathlib.Path(sys.argv[1])
+manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+if manifest.get("schema") != "textus.piper-models.v1":
+    raise SystemExit("invalid Piper model manifest schema")
+
+def sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+expected_version = manifest["runtime"]["version"]
+actual_version = importlib.metadata.version("piper-tts")
+if actual_version != expected_version:
+    raise SystemExit(f"Piper runtime version mismatch: expected {expected_version}, got {actual_version}")
+license_path = pathlib.Path(manifest["runtime"]["licenseFile"])
+if not license_path.is_file():
+    raise SystemExit(f"missing Piper runtime license: {license_path}")
+if sha256(license_path) != manifest["runtime"]["licenseSha256"]:
+    raise SystemExit("Piper runtime license checksum mismatch")
+if not manifest.get("models"):
+    raise SystemExit("Piper model manifest has no models")
+for model in manifest["models"]:
+    for path_key, digest_key in (
+        ("model", "modelSha256"),
+        ("config", "configSha256"),
+        ("modelCard", "modelCardSha256"),
+    ):
+        path = pathlib.Path(model[path_key])
+        if not path.is_file():
+            raise SystemExit(f"missing Piper {path_key}: {path}")
+        actual = sha256(path)
+        expected = model[digest_key]
+        if actual != expected:
+            raise SystemExit(f"Piper {path_key} checksum mismatch for {model['id']}")
+PY
+}
+
+piper_synthesize() {
+  local model_id=""
+  local output=""
+  local input=""
+  local text=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --model)
+        model_id="${2:?piper-synthesize --model requires a model id}"
+        shift 2
+        ;;
+      --output)
+        output="${2:?piper-synthesize --output requires a WAV path}"
+        shift 2
+        ;;
+      --input)
+        input="${2:?piper-synthesize --input requires a UTF-8 text path}"
+        shift 2
+        ;;
+      --text)
+        text="${2:?piper-synthesize --text requires narration text}"
+        shift 2
+        ;;
+      --help|-h)
+        cat <<'USAGE'
+Usage: textus-toolchain piper-synthesize --model MODEL --output FILE (--input FILE | --text TEXT)
+
+Synthesizes one narration line with a bundled Piper model and writes canonical
+24 kHz mono 16-bit PCM WAV. The command never downloads runtime assets.
+USAGE
+        return 0
+        ;;
+      *)
+        echo "piper-synthesize: unknown option: $1" >&2
+        return 2
+        ;;
+    esac
+  done
+  if [[ -z "$model_id" || -z "$output" ]]; then
+    echo "piper-synthesize: --model and --output are required" >&2
+    return 2
+  fi
+  if [[ -n "$input" && -n "$text" ]]; then
+    echo "piper-synthesize: use exactly one of --input or --text" >&2
+    return 2
+  fi
+  if [[ -n "$input" ]]; then
+    test -f "$input" || { echo "piper-synthesize: input file not found: $input" >&2; return 2; }
+    text="$(cat "$input")"
+  fi
+  if [[ -z "$text" ]]; then
+    echo "piper-synthesize: narration text is empty" >&2
+    return 2
+  fi
+  check_tts
+  local model_path
+  model_path="$(/opt/piper/bin/python - "$TEXTUS_PIPER_MANIFEST" "$model_id" <<'PY'
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+matches = [model for model in manifest["models"] if model["id"] == sys.argv[2]]
+if len(matches) != 1:
+    raise SystemExit(f"unsupported Piper model: {sys.argv[2]}")
+print(matches[0]["model"])
+PY
+)"
+  local raw
+  raw="$(mktemp --suffix=.wav)"
+  if ! /opt/piper/bin/python -m piper -m "$model_path" -f "$raw" -- "$text"; then
+    rm -f "$raw"
+    return 1
+  fi
+  mkdir -p "$(dirname "$output")"
+  if ! ffmpeg -hide_banner -loglevel error -y -i "$raw" -ar 24000 -ac 1 -c:a pcm_s16le "$output"; then
+    rm -f "$raw"
+    return 1
+  fi
+  rm -f "$raw"
+  /opt/piper/bin/python - "$output" <<'PY'
+import subprocess
+import sys
+
+output = subprocess.check_output([
+    "ffprobe", "-v", "error", "-select_streams", "a:0",
+    "-show_entries", "stream=codec_name,sample_rate,channels,bits_per_sample",
+    "-of", "csv=p=0", sys.argv[1]
+], text=True).strip().split(",")
+if output != ["pcm_s16le", "24000", "1", "16"]:
+    raise SystemExit(f"non-canonical Piper WAV output: {','.join(output)}")
+PY
 }
 
 svg_pages_to_pdf() {
@@ -446,6 +593,10 @@ case "${1:-}" in
     shift
     render_web_page "$@"
     ;;
+  piper-synthesize)
+    shift
+    piper_synthesize "$@"
+    ;;
   check)
     target="${2:-all}"
     case "$target" in
@@ -466,6 +617,9 @@ case "${1:-}" in
         ;;
       video)
         check_video
+        ;;
+      tts)
+        check_tts
         ;;
       *)
         echo "textus-toolchain: unknown check target: $target" >&2

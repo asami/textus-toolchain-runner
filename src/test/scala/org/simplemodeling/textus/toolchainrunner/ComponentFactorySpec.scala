@@ -1,6 +1,6 @@
 /*
  * @since   Jul.  2, 2026
- * @version Jul. 18, 2026
+ * @version Jul. 20, 2026
  * @author  ASAMI, Tomoharu
  */
 package org.simplemodeling.textus.toolchainrunner
@@ -113,10 +113,13 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
     }
 
     "own the Textus toolchain Docker assets" in {
-      Given("the Textus toolchain Dockerfile, wrapper script, and packaged component developer manual")
+      Given("the Textus toolchain source assets")
       val root = Paths.get(sys.props("user.dir")).toAbsolutePath.normalize()
+
+      When("the Dockerfile, wrapper, narration manifest, and component manual are inspected")
       val dockerfile = Files.readString(root.resolve("docker/textus-toolchain/Dockerfile"), StandardCharsets.UTF_8)
       val script = Files.readString(root.resolve("docker/textus-toolchain/textus-toolchain"), StandardCharsets.UTF_8)
+      val pipermanifest = Files.readString(root.resolve("docker/textus-toolchain/piper-models.json"), StandardCharsets.UTF_8)
       val manual = Files.readString(root.resolve("src/main/web/docs/user-guide.html"), StandardCharsets.UTF_8)
       val manualmarkdown = Files.readString(root.resolve("src/main/web/docs/user-guide.md"), StandardCharsets.UTF_8)
 
@@ -126,6 +129,10 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
       dockerfile should include("ARG ASCIIDOCTOR_KROKI_VERSION=0.18.1")
       dockerfile should include("ARG PLAYWRIGHT_VERSION=1.61.1")
       dockerfile should include("ARG REMOTION_VERSION=4.0.490")
+      dockerfile should include("ARG PIPER_VERSION=1.4.2")
+      dockerfile should include("ARG PIPER_VOICES_REF=5b44ec7bab7c5822cfec48fbd5aa99db71a823d6")
+      dockerfile should include("PIPER_AMD64_SHA256")
+      dockerfile should include("PIPER_ARM64_SHA256")
       dockerfile should include("@antora/cli")
       dockerfile should include("ffmpeg")
       dockerfile should include("playwright")
@@ -135,6 +142,7 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
       dockerfile should include("python3-pil")
       dockerfile should include("whisper.cpp")
       dockerfile should include("ggml-base.bin")
+      dockerfile should include("piper-models.json")
       dockerfile should include("NODE_PATH")
       dockerfile should include("FROM ${KROKI_IMAGE}")
 
@@ -143,6 +151,9 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
       script should include("check_pdf")
       script should include("check_kroki")
       script should include("check_video")
+      script should include("check_tts")
+      script should include("piper_synthesize")
+      script should include("piper-synthesize")
       script should include("require_command remotion")
       script should include("require.resolve('@remotion/cli')")
       script should include("remotion versions")
@@ -166,6 +177,15 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
       script should include("SMARTDOX_KROKI_PORT=\"${SMARTDOX_KROKI_PORT:-9609}\"")
       script should include("textus-toolchain check ${target}: ok")
       script should include("exec \"$@\"")
+
+      And("the portable narration models have pinned provenance and permissive source terms")
+      pipermanifest should include("textus.piper-models.v1")
+      pipermanifest should include("en_US-ljspeech-medium")
+      pipermanifest should include("public-domain")
+      pipermanifest should include("en_US-joe-medium")
+      pipermanifest should include("CC0-1.0")
+      pipermanifest should include("modelSha256")
+      pipermanifest should include("licenseSha256")
 
       And("the CAR manual is the component developer source for direct Docker usage")
       manual should include("Textus Toolchain Runner")

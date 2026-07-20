@@ -136,6 +136,30 @@ docker run --rm ghcr.io/asami/textus-toolchain:latest python3 -c 'import PIL; pr
 
 The wrapper passes through commands when no Textus-specific command matches.
 
+### Portable Narration
+
+The image includes Piper `1.4.2` and two pinned U.S. English models:
+
+- `en_US-ljspeech-medium`, whose source dataset is public domain;
+- `en_US-joe-medium`, whose source dataset is CC0.
+
+Runtime and model downloads are SHA-256 verified at build time and by
+`textus-toolchain check tts`. The machine-readable provenance and license
+manifest is `/opt/textus/models/piper/manifest.json`.
+
+```sh
+printf '%s\n' 'Portable narration.' > narration.txt
+docker run --rm --network=none -v "$PWD:/work" -w /work \
+  ghcr.io/asami/textus-toolchain:latest \
+  textus-toolchain piper-synthesize \
+  --model en_US-ljspeech-medium \
+  --input narration.txt \
+  --output narration.wav
+```
+
+The command writes canonical 24 kHz mono 16-bit PCM WAV and performs no model
+download at runtime.
+
 Render a Web page directly for deterministic CI or diagnosis by placing the
 request in `request.json`:
 

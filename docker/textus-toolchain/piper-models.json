@@ -1,0 +1,45 @@
+{
+  "schema": "textus.piper-models.v1",
+  "runtime": {
+    "name": "piper-tts",
+    "version": "1.4.2",
+    "license": "GPL-3.0-or-later",
+    "source": "https://github.com/OHF-Voice/piper1-gpl/tree/v1.4.2",
+    "licenseFile": "/opt/textus/licenses/piper-COPYING",
+    "licenseSha256": "0ae0485a5bd37a63e63603596417e4eb0e653334fa6c7f932ca3a0e85d4af227"
+  },
+  "repository": {
+    "source": "https://huggingface.co/rhasspy/piper-voices",
+    "revision": "5b44ec7bab7c5822cfec48fbd5aa99db71a823d6"
+  },
+  "models": [
+    {
+      "id": "en_US-ljspeech-medium",
+      "language": "en-US",
+      "quality": "medium",
+      "sampleRate": 22050,
+      "license": "public-domain",
+      "licenseSource": "MODEL_CARD",
+      "model": "/opt/textus/models/piper/en_US-ljspeech-medium/en_US-ljspeech-medium.onnx",
+      "config": "/opt/textus/models/piper/en_US-ljspeech-medium/en_US-ljspeech-medium.onnx.json",
+      "modelCard": "/opt/textus/models/piper/en_US-ljspeech-medium/MODEL_CARD",
+      "modelSha256": "6f52a751e2349abe7a76735eb09dc1875298c77ea2342ffd2fef79ff81b87f22",
+      "configSha256": "141d612cc0a95ed7efc1ca936b845c2364967f2e9217c5dbfcf69fc4d6c65860",
+      "modelCardSha256": "fbee1529c89d36b3fe76d7e9f3f832dce17f44900a52d76a9bda735654766b4d"
+    },
+    {
+      "id": "en_US-joe-medium",
+      "language": "en-US",
+      "quality": "medium",
+      "sampleRate": 22050,
+      "license": "CC0-1.0",
+      "licenseSource": "MODEL_CARD",
+      "model": "/opt/textus/models/piper/en_US-joe-medium/en_US-joe-medium.onnx",
+      "config": "/opt/textus/models/piper/en_US-joe-medium/en_US-joe-medium.onnx.json",
+      "modelCard": "/opt/textus/models/piper/en_US-joe-medium/MODEL_CARD",
+      "modelSha256": "58afce0321b8d9c46d7cdf9c16500cc55a793b4220212dba6b70fb788b3baf06",
+      "configSha256": "3d6d5410b3795cb1950595247ef8f06190719e6fdbfa3a2356d8ec368e1aad33",
+      "modelCardSha256": "d2caa63aca0fccb155105e959e393e5c0c0f03a1f388ef5ba217b83ef860c760"
+    }
+  ]
+}

@@ -32,10 +32,10 @@ version as an image tag. Do not push SNAPSHOT tags as validated releases.
 
 ```bash
 docker build \
-  -t ghcr.io/asami/textus-toolchain:0.2.24-SNAPSHOT \
+  -t ghcr.io/asami/textus-toolchain:0.2.1-SNAPSHOT \
   docker/textus-toolchain
 
-docker run --rm ghcr.io/asami/textus-toolchain:0.2.24-SNAPSHOT textus-toolchain check all
+docker run --rm ghcr.io/asami/textus-toolchain:0.2.1-SNAPSHOT textus-toolchain check all
 ```
 
 Build:
@@ -56,6 +56,7 @@ docker run --rm ghcr.io/asami/textus-toolchain:latest textus-toolchain check kro
 docker run --rm ghcr.io/asami/textus-toolchain:latest textus-toolchain check bok
 docker run --rm ghcr.io/asami/textus-toolchain:latest textus-toolchain check pdf
 docker run --rm ghcr.io/asami/textus-toolchain:latest textus-toolchain check video
+docker run --rm ghcr.io/asami/textus-toolchain:latest textus-toolchain check tts
 ```
 
 The video check requires the Remotion CLI and verifies that `remotion`,
@@ -149,6 +150,29 @@ client hints and reduces automation disclosure without exposing raw headers or
 launch arguments to the application component.
 
 VOICEVOX Engine is not included. Cozy checks and uses VOICEVOX as an external HTTP service.
+
+Portable English narration is provided by Piper `1.4.2`. The image contains
+the `en_US-ljspeech-medium` model (public-domain source dataset) and
+`en_US-joe-medium` model (CC0 source dataset). Runtime and model downloads are
+pinned and SHA-256 verified during the image build. The same checks run through
+`textus-toolchain check tts`; provenance and license references are available
+at `/opt/textus/models/piper/manifest.json`.
+
+Generate canonical 24 kHz mono PCM16 WAV without runtime network access:
+
+```bash
+printf '%s\n' 'Portable narration.' > narration.txt
+docker run --rm --network=none -v "$PWD:/work" -w /work \
+  ghcr.io/asami/textus-toolchain:0.2.1-SNAPSHOT \
+  textus-toolchain piper-synthesize \
+  --model en_US-ljspeech-medium \
+  --input narration.txt \
+  --output narration.wav
+```
+
+`scripts/check-piper-tts.sh` builds only the snapshot tag and performs this
+offline smoke for both bundled models. Do not publish that tag as a validated
+release image.
 
 The v1 image includes whisper.cpp and the standard model at:
 

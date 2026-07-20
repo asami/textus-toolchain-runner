@@ -248,6 +248,24 @@ docker run --rm ghcr.io/asami/textus-toolchain:latest textus-toolchain check all
 docker run --rm ghcr.io/asami/textus-toolchain:latest ffmpeg -version
 docker run --rm ghcr.io/asami/textus-toolchain:latest python3 -c 'import PIL; print(PIL.__version__)'</code></pre>
 
+      <h3>Portable Narration</h3>
+      <p>
+        The image includes Piper <code>1.4.2</code> with the pinned
+        <code>en_US-ljspeech-medium</code> public-domain source-dataset model
+        and <code>en_US-joe-medium</code> CC0 source-dataset model. Build-time and runtime
+        SHA-256 checks are available through
+        <code>textus-toolchain check tts</code>. Machine-readable provenance
+        is stored at <code>/opt/textus/models/piper/manifest.json</code>.
+      </p>
+      <pre><code>printf '%s\n' 'Portable narration.' &gt; narration.txt
+docker run --rm --network=none -v "$PWD:/work" -w /work \
+  ghcr.io/asami/textus-toolchain:latest \
+  textus-toolchain piper-synthesize \
+  --model en_US-ljspeech-medium \
+  --input narration.txt \
+  --output narration.wav</code></pre>
+      <p>The command writes canonical 24 kHz mono 16-bit PCM WAV without runtime downloads.</p>
+
       <h3>Render a Web Page</h3>
       <p>
         Direct browser use is intended for deterministic CI and diagnosis.
