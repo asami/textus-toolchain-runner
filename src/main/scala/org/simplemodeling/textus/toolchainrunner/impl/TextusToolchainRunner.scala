@@ -1,6 +1,6 @@
 /*
  * @since   Jul.  4, 2026
- * @version Jul. 12, 2026
+ * @version Jul. 26, 2026
  * @author  ASAMI, Tomoharu
  */
 package org.simplemodeling.textus.toolchainrunner.impl
@@ -21,7 +21,7 @@ import org.simplemodeling.textus.toolchainrunner.ToolchainRunnerComponent
  * component operations.
  *
  * @since   Jul.  3, 2026
- * @version Jul. 12, 2026
+ * @version Jul. 26, 2026
  * @author  ASAMI, Tomoharu
  */
 final class TextusToolchainRunner(
@@ -101,7 +101,9 @@ final class TextusToolchainRunner(
       message = record.getString("message").getOrElse(""),
       out = record.getString("out").filter(_.nonEmpty),
       pageCount = record.getInt("pageCount").getOrElse(0),
-      dockerImage = record.getString("dockerImage").filter(_.nonEmpty)
+      dockerImage = record.getString("dockerImage").filter(_.nonEmpty),
+      metadata = record.getString("failureKind").filter(_.nonEmpty).
+        map("failureKind" -> _).toMap
     )
 
   private def _to_rendered_web_page_response(record: Record): Consequence[RenderedWebPageResponse] =

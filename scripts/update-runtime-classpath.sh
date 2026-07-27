@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/cncf-common.sh"
 mkdir -p "$(dirname "$CNCF_RUNTIME_CLASSPATH_FILE")"
 classpath="$(
   cd "$PROJECT_ROOT"
-  sbt --batch 'export Runtime / fullClasspath' | awk '/^\// { print; exit }'
+  sbt --batch 'export Runtime / fullClasspath' | awk '!found && /^\// { classpath = $0; found = 1 } END { if (classpath != "") print classpath }'
 )"
 
 if [[ -z "$classpath" ]]; then

@@ -1,8 +1,8 @@
 {
   "name": "textus-toolchain-runner",
-  "version": "0.2.1-SNAPSHOT",
+  "version": "0.2.1",
   "component": "textus-toolchain-runner",
   "config": {
-    "textus.server.default-port": "18009"
+    "textus.server.default-port": "18010"
   }
 }

@@ -12,6 +12,41 @@ Textus component that owns the Textus toolchain Docker image and exposes it as
 artifact conversion operations. The component does not own a specific artifact
 domain; it runs installed toolchain commands in a controlled Docker workspace.
 
+# DATATYPE
+
+## ToolchainFailureKind
+
+Classifies a failed artifact conversion. `invalid-input` means the operation
+input cannot identify a usable artifact. `execution-failed` means the
+configured toolchain command failed or did not produce the requested output.
+
+### ATTRIBUTE
+
+| name  | type   | multiplicity | max-length | pattern              |
+|-------+--------+--------------+------------+----------------------|
+| value | string | 1            | 16         | pass:[^[a-z-]+$]     |
+
+# VALUE
+
+## ToolchainArtifactResult
+
+### EXTENDS
+
+OperationResult
+
+### ATTRIBUTE
+
+| name         | type    | multiplicity |
+|--------------+---------+--------------|
+| valid        | boolean | 1            |
+| errorCount   | int     | 1            |
+| warningCount | int     | 1            |
+| message      | string  | 1            |
+| failureKind  | ToolchainFailureKind | ? |
+| out          | string  | 1            |
+| pageCount    | int     | 1            |
+| dockerImage  | string  | 1            |
+
 # SERVICE
 
 ## Toolchain
@@ -34,9 +69,6 @@ QUERY
 
 ##### INPUT
 
-###### TYPE
-ConvertSvgToPdfQuery
-
 ###### VALUE
 
 ####### ConvertSvgToPdfQuery
@@ -58,27 +90,8 @@ QueryAction
 ##### OUTPUT
 
 ###### TYPE
+
 ToolchainArtifactResult
-
-###### VALUE
-
-####### ToolchainArtifactResult
-
-######## EXTENDS
-
-OperationResult
-
-######## ATTRIBUTE
-
-| name         | type    | multiplicity |
-|--------------+---------+--------------|
-| valid        | boolean | 1            |
-| errorCount   | int     | 1            |
-| warningCount | int     | 1            |
-| message      | string  | 1            |
-| out          | string  | 1            |
-| pageCount    | int     | 1            |
-| dockerImage  | string  | 1            |
 
 #### convertSvgPagesToPdf
 
@@ -90,9 +103,6 @@ Converts multiple SVG files to a single multi-page PDF by running the
 QUERY
 
 ##### INPUT
-
-###### TYPE
-ConvertSvgPagesToPdfQuery
 
 ###### VALUE
 
@@ -115,27 +125,8 @@ QueryAction
 ##### OUTPUT
 
 ###### TYPE
+
 ToolchainArtifactResult
-
-###### VALUE
-
-####### ToolchainArtifactResult
-
-######## EXTENDS
-
-OperationResult
-
-######## ATTRIBUTE
-
-| name         | type    | multiplicity |
-|--------------+---------+--------------|
-| valid        | boolean | 1            |
-| errorCount   | int     | 1            |
-| warningCount | int     | 1            |
-| message      | string  | 1            |
-| out          | string  | 1            |
-| pageCount    | int     | 1            |
-| dockerImage  | string  | 1            |
 
 #### renderWebPage
 
@@ -148,9 +139,6 @@ so URLs and rendered HTML do not appear in process arguments or stdout.
 QUERY
 
 ##### INPUT
-
-###### TYPE
-RenderWebPageQuery
 
 ###### VALUE
 
@@ -175,9 +163,6 @@ QueryAction
 | workDir         | string | ?            |
 
 ##### OUTPUT
-
-###### TYPE
-RenderedWebPageResult
 
 ###### VALUE
 

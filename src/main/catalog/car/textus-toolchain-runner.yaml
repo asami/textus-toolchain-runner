@@ -2,9 +2,11 @@ schemaVersion: 1
 kind: car
 artifactId: textus-toolchain-runner
 recommended: 0.1.0
-latestStable: 0.2.0
+latestStable: 0.2.1
 status: active
 aliases: []
+tags: []
+terms: []
 versions:
   - version: 0.1.0
     channel: stable
@@ -34,3 +36,17 @@ versions:
           - 0.5.0
     checksum:
       sha256: 113450a6381efc8a72a810a1669715640daea8f4fb422cc0367b9deac4afa5cb
+  - version: 0.2.1
+    channel: stable
+    status: active
+    component: textus-toolchain-runner
+    publishedAt: 2026-07-27T09:37:42.472015+09:00
+    file: repository/car/textus-toolchain-runner/0.2.1/textus-toolchain-runner-0.2.1.car
+    runtime:
+      cncf:
+        minimum: 0.5.1
+        excluded: []
+        tested:
+          - 0.5.1
+    checksum:
+      sha256: 9179afe2676b2bd3e54255b7b72750b5763264e1dd112279b213f94b5e3bca7d

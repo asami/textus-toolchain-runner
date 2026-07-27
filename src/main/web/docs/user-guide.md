@@ -90,6 +90,17 @@ textus-toolchain-runner convert-svg-pages-to-pdf \
   --out print.pdf
 ```
 
+### Conversion Failure Results
+
+Failed conversion responses set `valid: false` and can include `failureKind`.
+`invalid-input` means the caller must correct a missing or invalid SVG/input.
+`execution-failed` means the Docker/toolchain command failed or did not write
+the requested artifact. The field is optional for compatibility with artifacts
+from earlier Toolchain Runner releases.
+
+The provider-neutral `ToolchainRunner` SPI preserves this value in
+`ToolchainArtifactResponse.metadata.failureKind`.
+
 ### renderWebPage
 
 Renders one HTTP(S) page through Playwright/Chromium and returns requested and

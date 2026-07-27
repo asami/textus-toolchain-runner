@@ -1,6 +1,6 @@
 /*
  * @since   Jul.  2, 2026
- * @version Jul. 20, 2026
+ * @version Jul. 26, 2026
  * @author  ASAMI, Tomoharu
  */
 package org.simplemodeling.textus.toolchainrunner
@@ -57,6 +57,35 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
       Files.readString(out, StandardCharsets.UTF_8) should include ("fake pdf")
     }
 
+    "preserve conversion failure classification through the ToolchainRunner SPI" in {
+      Given("a ToolchainRunner component and a missing SVG input")
+      val component = _component_under_test()
+      given ExecutionContext = component.logic.executionContext()
+      val dir = Files.createTempDirectory("textus-toolchain-runner-spi-failure-spec")
+      val missing = dir.resolve("missing.svg")
+      val out = dir.resolve("print.pdf")
+      val provider = component.port.entries.collectFirst {
+        case x: impl.TextusToolchainRunnerProvider => x
+      }.get
+      val spi = provider
+        .provide(SpiContract("toolchain-runner", classOf[ToolchainRunner]), SpiSelection())
+        .toOption
+        .get
+
+      When("the SPI delegates the invalid conversion request")
+      val response = spi.convertSvgPagesToPdf(
+        ConvertSvgPagesToPdfRequest(
+          svgFiles = Vector(missing.toString),
+          out = Some(out.toString)
+        )
+      ).toOption.get
+
+      Then("the SPI response preserves the operation failure classification")
+      response.valid shouldBe false
+      response.metadata.get("failureKind") shouldBe Some("invalid-input")
+      Files.exists(out) shouldBe false
+    }
+
     "convert SVG pages to a PDF through the configured Docker command" in {
       Given("a ToolchainRunner component and a fake docker command")
       val component = _component_under_test()
@@ -85,6 +114,55 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
       record.getString("dockerImage") shouldBe Some("fake/textus-toolchain:latest")
       Files.readString(out, StandardCharsets.UTF_8) should include ("fake pdf")
       Files.readString(dir.resolve("fake-docker-args.txt"), StandardCharsets.UTF_8) should include ("svg-pages-to-pdf")
+    }
+
+    "classify missing SVG input without claiming a toolchain outage" in {
+      Given("a ToolchainRunner component and a path that does not identify an SVG file")
+      val component = _component_under_test()
+      given ExecutionContext = component.logic.executionContext()
+      val dir = Files.createTempDirectory("textus-toolchain-runner-invalid-input-spec")
+      val missing = dir.resolve("missing.svg")
+      val out = dir.resolve("print.pdf")
+
+      When("convertSvgPagesToPdf is executed with the missing input")
+      val record = _operation_record(
+        component,
+        "convertSvgPagesToPdf",
+        "svgFiles" -> missing.toString,
+        "out" -> out.toString
+      )
+
+      Then("the response identifies the failure as invalid input")
+      record.getBoolean("valid") shouldBe Some(false)
+      record.getString("failureKind") shouldBe Some("invalid-input")
+      record.getString("message").getOrElse("") should include ("SVG file not found")
+      Files.exists(out) shouldBe false
+    }
+
+    "classify a failed toolchain command as an execution failure" in {
+      Given("a ToolchainRunner component, a valid SVG, and a failing Docker command")
+      val component = _component_under_test()
+      given ExecutionContext = component.logic.executionContext()
+      val dir = Files.createTempDirectory("textus-toolchain-runner-execution-failure-spec")
+      val svg = dir.resolve("main.svg")
+      val out = dir.resolve("print.pdf")
+      val failingdocker = _failing_docker(dir)
+      Files.writeString(svg, """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"/>""", StandardCharsets.UTF_8)
+
+      When("convertSvgPagesToPdf invokes the failing command")
+      val record = _operation_record(
+        component,
+        "convertSvgPagesToPdf",
+        "svgFiles" -> svg.toString,
+        "out" -> out.toString,
+        "dockerCommand" -> failingdocker.toString
+      )
+
+      Then("the response identifies the failure as a toolchain execution failure")
+      record.getBoolean("valid") shouldBe Some(false)
+      record.getString("failureKind") shouldBe Some("execution-failed")
+      record.getString("message").getOrElse("") should include ("toolchain command failed with exit 23")
+      Files.exists(out) shouldBe false
     }
 
     "use the Textus toolchain release image by default" in {
@@ -247,6 +325,19 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
          |exit 0
          |""".stripMargin
     Files.writeString(path, script, StandardCharsets.UTF_8)
+    path.toFile.setExecutable(true)
+    path
+  }
+
+  private def _failing_docker(dir: Path): Path = {
+    val path = dir.resolve("failing-docker.sh")
+    Files.writeString(
+      path,
+      """#!/bin/sh
+        |exit 23
+        |""".stripMargin,
+      StandardCharsets.UTF_8
+    )
     path.toFile.setExecutable(true)
     path
   }

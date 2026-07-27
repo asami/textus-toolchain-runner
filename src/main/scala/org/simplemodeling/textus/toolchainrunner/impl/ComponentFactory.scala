@@ -1,6 +1,6 @@
 /*
  * @since   Jul.  2, 2026
- * @version Jul. 12, 2026
+ * @version Jul. 26, 2026
  * @author  ASAMI, Tomoharu
  */
 package org.simplemodeling.textus.toolchainrunner.impl
@@ -72,6 +72,25 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
     out: Path,
     pagecount: Int,
     dockerimage: String
+  )
+
+  private sealed trait ToolchainRunFailureKind {
+    def value: String
+  }
+
+  private object ToolchainRunFailureKind {
+    case object InvalidInput extends ToolchainRunFailureKind {
+      val value = "invalid-input"
+    }
+
+    case object ExecutionFailed extends ToolchainRunFailureKind {
+      val value = "execution-failed"
+    }
+  }
+
+  private final case class ToolchainRunFailure(
+    kind: ToolchainRunFailureKind,
+    message: String
   )
 
   override def createConvertSvgToPdfActionCall(
@@ -182,17 +201,19 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
     dockerimage: String,
     dockercommand: String,
     workdir: Option[Path],
-    pure: Either[String, ToolchainRunResult] => ExecUowM[Either[String, ToolchainRunResult]],
+    pure: Either[ToolchainRunFailure, ToolchainRunResult] => ExecUowM[Either[ToolchainRunFailure, ToolchainRunResult]],
     runshell: (Vector[String], Path) => ExecUowM[Either[String, String]]
-  ): ExecUowM[Either[String, ToolchainRunResult]] = {
-    val inputs = svgfiles.map(s => Paths.get(s).toAbsolutePath.normalize)
-    val validation: Either[String, Vector[Path]] =
-      if (inputs.isEmpty)
-        Left("svgFiles must contain at least one SVG file")
-      else
-        inputs.find(path => !Files.isRegularFile(path)).
-          map(path => Left(s"SVG file not found: ${path.toString}")).
-          getOrElse(Right(inputs))
+  ): ExecUowM[Either[ToolchainRunFailure, ToolchainRunResult]] = {
+    val inputs = Try(svgfiles.map(s => Paths.get(s).toAbsolutePath.normalize)).toEither.left.map(_invalid_input_failure)
+    val validation: Either[ToolchainRunFailure, Vector[Path]] =
+      inputs.flatMap { paths =>
+        if (paths.isEmpty)
+          Left(ToolchainRunFailure(ToolchainRunFailureKind.InvalidInput, "svgFiles must contain at least one SVG file"))
+        else
+          paths.find(path => !Files.isRegularFile(path)).
+            map(path => Left(ToolchainRunFailure(ToolchainRunFailureKind.InvalidInput, s"SVG file not found: ${path.toString}"))).
+            getOrElse(Right(paths))
+      }
     validation.flatMap { checkedinputs =>
       Try {
         val work = workdir.map(_.toAbsolutePath.normalize).
@@ -218,14 +239,14 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
           workout.getFileName.toString
         ) ++ pages
         Right((command, work, workout, pages.length))
-      }.toEither.left.map(e => s"${e.getClass.getSimpleName}: ${Option(e.getMessage).getOrElse("")}").flatten
+      }.toEither.left.map(_execution_failure_from_exception).flatten
     } match {
-      case Left(message) => pure(Left(message))
+      case Left(failure) => pure(Left(failure))
       case Right((command, work, workout, pagecount)) =>
         runshell(command, work).map { result =>
-          result.flatMap { _ =>
+          result.left.map(_execution_failure_from_message).flatMap { _ =>
             if (!Files.isRegularFile(workout))
-              Left("toolchain did not create output.pdf")
+              Left(ToolchainRunFailure(ToolchainRunFailureKind.ExecutionFailed, "toolchain did not create output.pdf"))
             else {
               val outabs = out.toAbsolutePath.normalize
               val parent = outabs.getParent
@@ -289,7 +310,22 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
       "cozy.docker.image"
     ).flatMap(config).map(_.trim).find(_.nonEmpty)
 
-  private def _to_response(result: Either[String, ToolchainRunResult], out: String): OperationResponse =
+  private def _invalid_input_failure(error: Throwable): ToolchainRunFailure =
+    ToolchainRunFailure(
+      ToolchainRunFailureKind.InvalidInput,
+      s"${error.getClass.getSimpleName}: ${Option(error.getMessage).getOrElse("")}"
+    )
+
+  private def _execution_failure_from_exception(error: Throwable): ToolchainRunFailure =
+    ToolchainRunFailure(
+      ToolchainRunFailureKind.ExecutionFailed,
+      s"${error.getClass.getSimpleName}: ${Option(error.getMessage).getOrElse("")}"
+    )
+
+  private def _execution_failure_from_message(message: String): ToolchainRunFailure =
+    ToolchainRunFailure(ToolchainRunFailureKind.ExecutionFailed, message)
+
+  private def _to_response(result: Either[ToolchainRunFailure, ToolchainRunResult], out: String): OperationResponse =
     result match {
       case Right(value) =>
         OperationResponse.RecordResponse(Record.data(
@@ -301,12 +337,13 @@ final class DefaultToolchainServiceFactory extends ToolchainRunnerComponent.Tool
           "pageCount" -> value.pagecount,
           "dockerImage" -> value.dockerimage
         ))
-      case Left(message) =>
+      case Left(failure) =>
         OperationResponse.RecordResponse(Record.data(
           "valid" -> false,
           "errorCount" -> 1,
           "warningCount" -> 0,
-          "message" -> message,
+          "message" -> failure.message,
+          "failureKind" -> failure.kind.value,
           "out" -> out,
           "pageCount" -> 0,
           "dockerImage" -> ""

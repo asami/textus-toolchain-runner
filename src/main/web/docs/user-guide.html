@@ -200,6 +200,19 @@ curl -fsS -o user-guide.pdf http://localhost:8080/man/textus-toolchain-runner/us
   --svgFiles page-001.svg,page-002.svg \
   --out print.pdf</code></pre>
 
+      <h3>Conversion Failure Results</h3>
+      <p>
+        Failed conversion responses set <code>valid: false</code> and can include
+        <code>failureKind</code>. <code>invalid-input</code> means the caller must
+        correct a missing or invalid SVG/input. <code>execution-failed</code> means
+        the Docker/toolchain command failed or did not write the requested artifact.
+        The field is optional for compatibility with earlier Toolchain Runner releases.
+      </p>
+      <p>
+        The provider-neutral <code>ToolchainRunner</code> SPI preserves this value
+        in <code>ToolchainArtifactResponse.metadata.failureKind</code>.
+      </p>
+
       <h3>renderWebPage</h3>
       <p>
         Renders one HTTP(S) page through Playwright/Chromium and returns

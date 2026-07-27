@@ -70,6 +70,21 @@ Textus toolchain image and invokes the image-level `svg-pages-to-pdf` subcommand
 That subcommand is part of the toolchain image contract; the Textus component
 owns Docker invocation, workspace mounting, and operation results.
 
+### Failure Results
+
+Failed conversion responses set `valid: false` and may include `failureKind`:
+
+- `invalid-input`: the supplied SVG path or operation input is invalid. Callers
+  should correct the request rather than retrying the runtime.
+- `execution-failed`: the Docker/toolchain command failed or produced no output.
+  Callers may report a service failure and retry after the runtime is repaired.
+
+The field is optional so consumers can continue to handle artifacts produced by
+earlier Toolchain Runner releases that did not classify failures.
+
+The provider-neutral `ToolchainRunner` SPI preserves this value in
+`ToolchainArtifactResponse.metadata.failureKind`.
+
 ### renderWebPage
 
 Renders one HTTP(S) page with Playwright/Chromium and returns structured page
