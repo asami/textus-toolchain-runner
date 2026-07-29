@@ -2,7 +2,7 @@
   "format": "cozy.car.abi-manifest.v1",
   "car": {
     "name": "textus-toolchain-runner",
-    "version": "0.2.1"
+    "version": "0.2.1-SNAPSHOT"
   },
   "abi": {
     "version": 1,
