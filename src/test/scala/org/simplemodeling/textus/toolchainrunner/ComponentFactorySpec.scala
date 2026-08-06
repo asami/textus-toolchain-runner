@@ -1,6 +1,6 @@
 /*
  * @since   Jul.  2, 2026
- * @version Jul. 26, 2026
+ * @version Aug.  6, 2026
  * @author  ASAMI, Tomoharu
  */
 package org.simplemodeling.textus.toolchainrunner
@@ -12,6 +12,7 @@ import org.goldenport.cncf.context.ExecutionContext
 import org.goldenport.cncf.spi.{SpiContract, SpiSelection}
 import org.goldenport.cncf.spi.toolchain.runner.{ConvertSvgPagesToPdfRequest, ToolchainRunner}
 import org.goldenport.cncf.subsystem.Subsystem
+import org.goldenport.cncf.testutil.RuntimeBindingAdmissionFixture
 import org.goldenport.configuration.{Configuration, ConfigurationTrace, ResolvedConfiguration}
 import org.goldenport.protocol.{Property, Request}
 import org.goldenport.protocol.operation.OperationResponse
@@ -282,9 +283,11 @@ class ComponentFactorySpec extends AnyWordSpec with Matchers with GivenWhenThen 
 
   private def _component_under_test(): impl.ToolchainRunnerPrimaryComponent = {
     val bundlefactory = new impl.ComponentFactory()
-    val subsystem = new Subsystem(
-      name = "toolchain-runner-spec",
-      configuration = ResolvedConfiguration(Configuration.empty, ConfigurationTrace.empty)
+    val subsystem = RuntimeBindingAdmissionFixture.admit(
+      new Subsystem(
+        name = "toolchain-runner-spec",
+        configuration = ResolvedConfiguration(Configuration.empty, ConfigurationTrace.empty)
+      )
     )
     val bundle = bundlefactory.create(ComponentCreate(subsystem, ComponentOrigin.Main))
     subsystem.add(bundle.participants)
