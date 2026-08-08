@@ -1,7 +1,8 @@
 {
-  "format": "cozy.car.abi-manifest.v1",
-  "car": {
-    "name": "textus-toolchain-runner",
+  "format": "cozy.car.abi-manifest.v2",
+  "component": {
+    "namespace": "org.simplemodeling.textus",
+    "id": "ToolchainRunner",
     "version": "0.2.1-SNAPSHOT"
   },
   "abi": {
@@ -9,7 +10,8 @@
     "exports": {
       "components": [
         {
-          "name": "textus-toolchain-runner"
+          "namespace": "org.simplemodeling.textus",
+          "id": "ToolchainRunner"
         }
       ],
       "operations": [],
