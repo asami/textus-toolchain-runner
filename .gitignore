@@ -5,3 +5,4 @@ maven-local
 .scala-build/
 .idea/
 .DS_Store
+.cozy/
